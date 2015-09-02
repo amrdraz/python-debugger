@@ -2,15 +2,6 @@
 {% extends './layouts/base.swig' %}
 
 {% block content %}
-<section class="description panel panel-default">
-  <div class="panel-heading">
-    <span class="pull-right label label-primary">something</span>
-    <h2 class="panel-title">Title</h2>
-    </div>
-    <div class="panel-body">
-        Hello there
-    </div>
-</section>
 <section class="row">
 <div class="col-lg-6">
   <div class="row">
@@ -19,7 +10,6 @@
     <button id="back" class="btn pull-left" disabled> &#8676; Back</button>
     <button id="step" class="btn pull-left" disabled> &#8677; Step</button>
     <button id="stop" class="btn pull-left" disabled> ■ Stop</button>
-    <button id="show_js" class="btn pull-right"> Show JS</button>
   </div>
   <div class="row">
       <ul class="nav nav-tabs">

@@ -12,7 +12,7 @@
   <head>
     <meta charset="utf-8"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
-    <title>Sample</title>
+    <title>Python Debugger</title>
     <meta name="description" content=""/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <!-- build:css(client) styles/global.css -->
@@ -57,8 +57,8 @@
           <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
             <li>
-                <a href="about.html" class="btn" >
-                  About
+                <a href="https://github.com/amrdraz/python-debugger" class="btn" >
+                  Github Repo
                 </a>
             </li>
             </ul>
