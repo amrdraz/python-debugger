@@ -52,7 +52,7 @@
               <span class="icon-bar"></span>
               <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="#">Ko;dr - Brython Debugger</a>
+            <a class="navbar-brand" href="#">Python Debugger</a>
           </div>
           <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
