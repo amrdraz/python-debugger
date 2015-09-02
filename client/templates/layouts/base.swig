@@ -1,0 +1,87 @@
+{#
+  Base template
+  All other templates should extend from this
+#}
+
+{# [injector:swig] #}
+{# [endinjector] #}
+
+<!DOCTYPE html>
+<!--[if lte IE 8]><html class="lt-ie9 no-js" lang="en"><![endif]-->
+<!--[if gt IE 8]><!--><html lang="en" class="ie9 no-js"><!--<![endif]-->
+  <head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <title>Sample</title>
+    <meta name="description" content=""/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <!-- build:css(client) styles/global.css -->
+      <!-- bower:css -->
+      <link rel="stylesheet" href="/bower_components/codemirror/lib/codemirror.css" />
+      <!-- endbower -->
+      {% block extra_style %}
+      {% endblock %}
+    <!-- endbuild -->
+
+    <link rel="stylesheet" href="styles/main.css">
+    <!-- build:js(client) scripts/modernizr.js -->
+    <script src="/bower_components/modernizr/modernizr.js"></script>
+    <!-- endbuild -->
+
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- build:js(client) scripts/shims.js -->
+    <!--[if lt IE 9]>
+    <script src="/bower_components/consolelog/consolelog.js"></script>
+    <script src="/bower_components/html5shiv/dist/html5shiv-printshiv.js"></script>
+    <![endif]-->
+    <!-- endbuild -->
+  </head>
+  <body>
+    <!--[if lte IE 7]>
+    <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+    <![endif]-->
+
+    {% block layout %}
+    <div id="wrap">
+    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+        <div class="container">
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#">Ko;dr - Brython Debugger</a>
+          </div>
+          <div class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+            <li>
+                <a href="about.html" class="btn" >
+                  About
+                </a>
+            </li>
+            </ul>
+          </div>
+        </div>
+    </div>
+  
+    <div class="container marketing">
+    {% block content %}{% endblock %}
+    </div>
+    </div>
+    {% endblock %}
+    <!-- build:js(client) scripts/global.js -->
+      <script src="/bower_components/lodash/lodash.js"></script>
+      {% block extra_script %}
+      {% endblock %}
+    <!-- endbuild -->
+    
+    <script src="scripts/brython/www/src/brython_dist.js"></script>
+   <!-- build:js(client) scripts/main.js -->
+    <script src="scripts/debugger/main.js" type="text/javascript" charset="utf-8"></script>
+    <script src="scripts/debugger/user.js" type="text/javascript" charset="utf-8"></script>
+    <!-- endbuild -->
+    
+  </body>
+</html>
