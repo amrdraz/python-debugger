@@ -1,5 +1,6 @@
 (function(win) {
     var Debugger = win.Brython_Debugger = {
+        run_no_debugger: runNoTrace,
         start_debugger: startDebugger,
         stop_debugger: stopDebugger,
         step_debugger: stepDebugger,
@@ -200,11 +201,13 @@
         var trace = {
             event: 'line',
             type: 'runtime_error',
-            data: _b_.getattr(exc, 'info') + '\n' + _b_.getattr(exc, '__name__') + ": " +exc.$message + '\n', 
+            data: _b_.getattr(err, 'info') + '\n' + _b_.getattr(err, '__name__') + ": " +err.$message + '\n', 
             stack: err.$stack,
             message: err.$message,
+            name: _b_.getattr(err, '__name__'),
             frame: $B.last(err.$stack),
             err: err,
+            step: getRecordedStates().length -1,
             line_no: +($B.last(err.$stack)[1].$line_info.split(',')[0]),
             next_line_no: +($B.last(err.$stack)[1].$line_info.split(',')[0]),
             module_name: +($B.last(err.$stack)[1].$line_info.split(',')[1])
@@ -212,10 +215,12 @@
         if (getRecordedStates().length > 0) {
             if(getRecordedStates().length>=stepLimit) {
                 trace.type = 'infinit_loop';
-                recordedStates.push(trace)
+                recordedStates.push(trace);
             } else {
                 setTrace(trace);   
             }
+        } else {
+            trace.type = 'syntax_error';
         }
         events_cb.debugError(trace, Debugger);
     }
@@ -663,6 +668,46 @@
                 throw $B.exception(err);
             }
             throw err;
+        }
+    }
+
+    /**
+     * Run Code without trace
+     * @param  {[type]} code [description]
+     * @return {[type]}      [description]
+     */
+    function runNoTrace (code) {
+        var module_name = '__main__';
+        $B.$py_module_path[module_name] = window.location.href;
+        try {
+            var root = $B.py2js(code, module_name, module_name, '__builtins__');
+            
+            var js = root.to_js();
+            if ($B.debug > 1) {
+                console.log(js);
+            }
+
+            var None = _b_.None;
+            var getattr = _b_.getattr;
+            var setattr = _b_.setattr;
+
+            if ($B.async_enabled) {
+                js = $B.execution_object.source_conversion(js);
+
+                //console.log(js)
+                eval(js);
+            } else {
+                // Run resulting Javascript
+                eval(js);
+            }
+        } catch (exc) {
+            $B.leave_frame();
+            $B.leave_frame();
+            if (exc.$py_error) {
+                errorWhileDebugging(exc);
+            } else {
+                throw exc;
+            }
         }
     }
 
