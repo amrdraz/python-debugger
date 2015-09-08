@@ -3,6 +3,10 @@
 
 var $module = (function($B){
 
+_b_ = $B.builtins
+
+var VERSION = 3
+
 // Code copied from https://github.com/ianb/whrandom/blob/master/mersenne.js
 // by Ian Bicking
 
@@ -246,7 +250,7 @@ function RandomStream(seed) {
   }
   /* These real versions are due to Isaku Wada, 2002/01/09 added */
 
-  var random = genrand_real2;
+  var random = genrand_res53;
 
   random.seed = function (seed) {
     if (! seed) {
@@ -270,18 +274,18 @@ function RandomStream(seed) {
   random.res53 = genrand_res53;
   
   // Added for compatibility with Python
-  random.getstate = function(){return [mt, mti]}
+  random.getstate = function(){return [VERSION, mt, mti]}
   
   random.setstate = function(state){
-    mt = state[0]
-    mti = state[1]
+    mt = state[1]
+    mti = state[2]
   }
 
   return random;
 
 }
 
-function Random(){
+function _Random(){
     var _random = RandomStream()
     
     _b_ = $B.builtins
@@ -304,14 +308,20 @@ function Random(){
         return _b_.bytes(randbytes)
     }
     
-    return {
+    var res = {
+        // magic constants
+        NV_MAGICCONST: 1.71552776992141,
+        TWOPI: 6.28318530718,
+        LOG4: 1.38629436111989,
+        SG_MAGICCONST: 2.50407739677627,
+
         choice: function(seq){
             var $ = $B.$MakeArgs1('choice', 1,
                 {seq:null},['seq'],arguments, {}, null, null),
                 seq = $.seq
             var len, rank
             if(Array.isArray(seq)){len = seq.length}
-            else{len = _b_.getattr(seq,'__len__')}
+            else{len = _b_.getattr(seq,'__len__')()}
             if(len==0){throw _b_.IndexError("Cannot choose from an empty sequence")}
             rank = parseInt(_random()*len)
             if(Array.isArray(seq)){return seq[rank]}
@@ -551,8 +561,39 @@ function Random(){
                     step = $.step===null ? 1 : $.step
                 if(step==0){throw _b_.ValueError('step cannot be 0')}
             }
-            var nb = Math.floor((stop-start)/step)
-            return start + Math.floor(_random()*nb)*step
+            if(typeof start=='number' && typeof stop == 'number' &&
+                typeof step=='number'){
+                return start+step*Math.floor(_random()*Math.floor((stop-start)/step))
+            }else{
+                var d = _b_.getattr(stop,'__sub__')(start)
+                d = _b_.getattr(d, '__floordiv__')(step)
+                // Force d to be a LongInt
+                d = $B.LongInt(d)
+                // d is a long integer with n digits ; to choose a random number
+                // between 0 and d the most simple is to take a random digit
+                // at each position, except the first one
+                var s = d.value, _len = s.length,
+                    res = Math.floor(_random()*(parseInt(s.charAt(0))+(_len==1 ? 0 : 1)))+''
+                var same_start = res.charAt(0)==s.charAt(0)
+                for(var i=1;i<_len;i++){
+                    if(same_start){
+                        // If it's the last digit, don't allow stop as valid
+                        if(i==_len-1){
+                            res += Math.floor(_random()*parseInt(s.charAt(i)))+''
+                        }else{
+                            res += Math.floor(_random()*(parseInt(s.charAt(i))+1))+''
+                            same_start = res.charAt(i)==s.charAt(i)
+                        }
+                    }else{
+                        res += Math.floor(_random()*10)+''
+                    }
+                }
+                var offset = {__class__:$B.LongInt.$dict, value: res, 
+                    pos: true}
+                d = _b_.getattr(step, '__mul__')(offset)
+                d = _b_.getattr(start, '__add__')(d)
+                return _b_.int(d)
+            }
         },
     
         sample: function(){
@@ -675,6 +716,31 @@ function Random(){
             // Restore internal state from object returned by getstate().
             var $ = $B.$MakeArgs1('setstate', 1, {state:null}, ['state'], 
                 arguments, {}, null, null)
+            var state = _random.getstate()
+            if(!Array.isArray($.state)){
+                throw _b_.TypeError('state must be a list, not '+
+                    $B.get_class($.state).__name__)
+            }
+            if($.state.length<state.length){
+                throw _b_.ValueError("need more than "+$.state.length+
+                    " values to unpack")
+            }else if($.state.length>state.length){
+                throw _b_.ValueError("too many values to unpack (expected "+
+                    state.length+")")
+            }
+            if($.state[0]!=3){
+                throw _b_.ValueError("ValueError: state with version "+
+                    $.state[0]+" passed to Random.setstate() of version 3")
+            }
+            var second = _b_.list($.state[1])
+            if(second.length!==state[1].length){
+                throw _b_.ValueError('state vector is the wrong size')
+            }
+            for(var i=0;i<second.length;i++){
+                if(typeof second[i] != 'number'){
+                    throw _b_.ValueError('state vector items must be integers')
+                }
+            }
             _random.setstate($.state)
         },
     
@@ -820,48 +886,82 @@ function Random(){
             u = 1 - _random()
             return alpha * Math.pow(-Math.log(u), 1/beta)
         },
-    
-        VERSION: 3
+        
+        VERSION: VERSION
     }
-}
 
-var $module = Random()
-
-$module.lognormvariate = function(){
-    /*
-    Log normal distribution.
-
-    If you take the natural logarithm of this distribution, you'll get a
-    normal distribution with mean mu and standard deviation sigma.
-    mu can have any value, and sigma must be greater than zero.
-
-    */
-
-    return Math.exp($module.normalvariate.apply(null, arguments))
-}
-
-$module.betavariate = function(){
-    /* Beta distribution.
-
-    Conditions on the parameters are alpha > 0 and beta > 0.
-    Returned values range between 0 and 1.
-
-
-    # This version due to Janne Sinkkonen, and matches all the std
-    # texts (e.g., Knuth Vol 2 Ed 3 pg 134 "the beta distribution").
-    */
+    res.lognormvariate = function(){
+        /*
+        Log normal distribution.
     
-    var $ = $B.$MakeArgs1('betavariate', 2, {alpha:null, beta:null},
-            ['alpha', 'beta'], arguments, {}, null, null),
-        alpha = $.alpha,
-        beta = $.beta
+        If you take the natural logarithm of this distribution, you'll get a
+        normal distribution with mean mu and standard deviation sigma.
+        mu can have any value, and sigma must be greater than zero.
+    
+        */
+    
+        return Math.exp(res.normalvariate.apply(null, arguments))
+    }
+    
+    res.betavariate = function(){
+        /* Beta distribution.
+    
+        Conditions on the parameters are alpha > 0 and beta > 0.
+        Returned values range between 0 and 1.
+    
+    
+        # This version due to Janne Sinkkonen, and matches all the std
+        # texts (e.g., Knuth Vol 2 Ed 3 pg 134 "the beta distribution").
+        */
+        
+        var $ = $B.$MakeArgs1('betavariate', 2, {alpha:null, beta:null},
+                ['alpha', 'beta'], arguments, {}, null, null),
+            alpha = $.alpha,
+            beta = $.beta
+    
+        y = res.gammavariate(alpha, 1)
+        if(y == 0){return _b_.float(0)}
+        else{return y / (y + res.gammavariate(beta, 1))}
+    }
+    
+    return res
 
-    y = $module.gammavariate(alpha, 1)
-    if(y == 0){return _b_.float(0)}
-    else{return y / (y + $module.gammavariate(beta, 1))}
 }
+
+function Random(){
+    var obj = {__class__: Random.$dict}
+    Random.$dict.__init__(obj)
+    return obj
+}
+Random.__class__ = $B.$factory
+Random.$dict = {
+    __class__: $B.$type,
+    __name__: 'Random',
+    $factory: Random,
+    __init__: function(self){self.$r = _Random()},
+    __getattribute__: function(self, attr){return self.$r[attr]}
+}
+Random.$dict.__mro__ = [Random.$dict, $B.builtins.object.$dict]
+
+var $module = _Random()
 
 $module.Random = Random
+
+$module.SystemRandom = function(){
+    var f = function(){return {__class__:f.$dict}}
+    f.__class__ = $B.$factory
+    f.$dict = {
+        __class__: $B.$type,
+        __name__: 'SystemRandom',
+        $factory: f,
+        __getattribute__: function(){
+            throw $B.builtins.NotImplementedError()
+        }
+    }
+    f.$dict.__mro__ = [f.$dict, $B.builtins.object.$dict]
+    return f()
+}
+
 return $module
 
 })(__BRYTHON__)

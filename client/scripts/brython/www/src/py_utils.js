@@ -53,12 +53,13 @@ $B.$MakeArgs1 = function($fname,argcount,slots,var_names,$args,$dobj,
     // Then fill slots with keyword arguments, if any
     if(has_kw_args){
         for(var key in kw_args){
+            var value=kw_args[key], key = key.replace(/\$/g,'')
             if(slots[key]===undefined){
                 // The name of the keyword argument doesn't match any of the
                 // formal parameters
                 if(extra_kw_args){
                     // If there is a place to store extra keyword arguments
-                    slots[extra_kw_args].$string_dict[key]=kw_args[key]
+                    slots[extra_kw_args].$string_dict[key]=value
                 }else{
                     throw _b_.TypeError($fname+"() got an unexpected keyword argument '"+key+"'")
                 }
@@ -67,7 +68,7 @@ $B.$MakeArgs1 = function($fname,argcount,slots,var_names,$args,$dobj,
                 throw _b_.TypeError($fname+"() got multiple values for argument '"+key+"'")            
             }else{    
                 // Fill the slot with the key/value pair
-                slots[key] = kw_args[key]
+                slots[key] = value
             }
         }
     }
@@ -270,7 +271,7 @@ $B.$gen_expr = function(env){
     // Create the variables for enclosing namespaces, they may be referenced
     // in the expression
     for(var i=0;i<env.length;i++){
-        var sc_id = '$locals_'+env[i][0].replace(/\./,'_')
+        var sc_id = '$locals_'+env[i][0].replace(/\./g,'_')
         eval('var '+sc_id+'=env[i][1]')
     }
     var local_name = env[0][0]
@@ -877,7 +878,8 @@ $B.$GetInt=function(value) {
   // convert value to an integer
   if(typeof value=="number"){return value}
   else if(typeof value==="boolean"){return value ? 1 : 0}
-  else if (_b_.isinstance(value, [_b_.int, _b_.float])) {return value.valueOf()}
+  else if (_b_.isinstance(value, _b_.int)) {return value}
+  else if (_b_.isinstance(value, _b_.float)) {return value.valueOf()}
   try {var v=_b_.getattr(value, '__int__')(); return v}catch(e){}
   try {var v=_b_.getattr(value, '__index__')(); return v}catch(e){}
   throw _b_.TypeError("'"+$B.get_class(value).__name__+
@@ -897,6 +899,15 @@ $B.leave_frame = function(){
 }
 
 var min_int=Math.pow(-2, 53), max_int=Math.pow(2,53)-1
+
+$B.is_safe_int = function(){
+    for(var i=0;i<arguments.length;i++){
+        var arg = arguments[i]
+        if(arg<min_int || arg>max_int){return false}
+    }
+    return true
+}
+
 $B.add = function(x,y){
     var z = x+y
     if(x>min_int && x<max_int && y>min_int && y<max_int

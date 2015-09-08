@@ -132,6 +132,10 @@ function preformat(self, fmt){
 
 $IntDict.__format__ = function(self,format_spec){
     var fmt = new $B.parse_format_spec(format_spec)
+    if(fmt.type && 'eEfFgG%'.indexOf(fmt.type)!=-1){
+        // Call __format__ on float(self)
+        return _b_.float.$dict.__format__(self, format_spec)        
+    }
     fmt.align = fmt.align || '>'
     var res = preformat(self, fmt)
     if(fmt.comma){
@@ -345,10 +349,14 @@ $B.min_int32= - $B.max_int32
 // code for operands & | ^
 var $op_func = function(self,other){
     if(isinstance(other,int)) {
-       if (self > $B.max_int32 || self < $B.min_int32 || other > $B.max_int32 || other < $B.min_int32) {
-          return $B.LongInt.$dict.__sub__($B.LongInt(self), $B.LongInt(other))
-       }
-       return self-other
+        if(other.__class__===$B.LongInt.$dict){
+            return $B.LongInt.$dict.__sub__($B.LongInt(self), $B.LongInt(other))
+        }
+        if (self > $B.max_int32 || self < $B.min_int32 || 
+            other > $B.max_int32 || other < $B.min_int32) {
+            return $B.LongInt.$dict.__sub__($B.LongInt(self), $B.LongInt(other))
+        }
+        return self-other
     }
     if(isinstance(other,_b_.bool)) return self-other
     if(hasattr(other,'__rsub__')) return getattr(other,'__rsub__')(self)
@@ -463,9 +471,10 @@ var int = function(value, base){
     var base = $ns['base']
     
     if(isinstance(value, _b_.float) && base===10){
-        var res = parseInt(value)
-        if(res<$B.min_int || res>$B.max_int){return $B.LongInt(res+'')}
-        else{return res}
+        if(value<$B.min_int || value>$B.max_int){
+            return $B.LongInt.$dict.$from_float(value)
+        }
+        else{return value>0 ? Math.floor(value) : Math.ceil(value)}
     }
 
     if (!(base >=2 && base <= 36)) {

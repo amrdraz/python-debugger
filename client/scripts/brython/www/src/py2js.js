@@ -74,8 +74,7 @@ var $op_order = [['or'],['and'],
     ['>>','<<'],
     ['+'],
     ['-'],
-    ['*'],
-    ['/','//','%'],
+    ['*','/','//','%'],
     ['unary_neg','unary_inv'],
     ['**']
 ]
@@ -1581,6 +1580,20 @@ function $ContinueCtx(context){
     }
 }
 
+function $DebuggerCtx(context){
+    // Class for keyword "continue"
+    this.type = 'continue'
+    this.parent = context
+    context.tree[context.tree.length]=this
+
+    this.toString = function(){return '(debugger)'}
+    
+    this.to_js = function(){
+        this.js_processed=true
+        return 'debugger'
+    }
+}
+
 function $DecoratorCtx(context){
     // Class for decorators
     this.type = 'decorator'
@@ -2536,14 +2549,14 @@ function $ForExpr(context){
             var for_node = new $Node()  
             new $NodeJSCtx(for_node,js)
             
-            for_node.add($NodeJS('if($safe'+num+'){'+idt+'++}'))
-            for_node.add($NodeJS('else{'+idt+'=$B.add('+idt+',1)}'))
-            for_node.add($NodeJS('if($safe'+num+' && '+idt+'>= $stop_'+
+            for_node.add($NodeJS('if($safe'+num+'){var $next'+num+'='+idt+'+1'+'}'))
+            for_node.add($NodeJS('else{var $next'+num+'=$B.add('+idt+',1)}'))
+            for_node.add($NodeJS('if($safe'+num+' && $next'+num+'>= $stop_'+
                 num+'){break}'))
             for_node.add($NodeJS('else if(!$safe'+num+
-                ' && $B.ge('+idt+', $stop_'+num+
+                ' && $B.ge($next'+num+', $stop_'+num+
                 ')){break}'))
-            
+            for_node.add($NodeJS(idt+' = $next'+num))            
             // Add the loop body            
             for(var i=0;i<children.length;i++){
                 for_node.add(children[i].clone())
@@ -4309,9 +4322,10 @@ function $TryCtx(context){
         if(!has_default){
             // If no default except clause, add a line to throw the
             // exception if it was not caught
-            var new_node = new $Node()
-            new $NodeJSCtx(new_node,'else{throw $err'+$loop_num+'}')
+            var new_node = new $Node(), ctx = new $NodeCtx(new_node)
             catch_node.insert(catch_node.children.length,new_node)
+            new $SingleKwCtx(ctx, 'else')
+            new_node.add($NodeJS('throw $err'+$loop_num))
         }
         if(has_else){
             var else_node = new $Node()
@@ -4472,8 +4486,7 @@ function $WithCtx(context){
         // if there is an alias, insert the value
         if(this.tree[0].alias){
             var alias = this.tree[0].alias
-            var js = '$locals_'+this.scope.id.replace(/\./g,'_')+
-                '["'+alias+'"] = $value'+num
+            var js = '$locals'+'["'+alias+'"] = $value'+num
             var value_node = new $Node()
             new $NodeJSCtx(value_node, js)
             try_node.add(value_node)
@@ -4487,7 +4500,8 @@ function $WithCtx(context){
         new $NodeJSCtx(catch_node,'catch($err'+$loop_num+')')
         
         var fbody = new $Node(), indent=node.indent+4
-        var js = '$exc'+num+' = false\n'+' '.repeat(indent)+
+        var js = '$exc'+num+' = false;$err'+$loop_num+'=$B.exception($err'+
+            $loop_num+')\n'+' '.repeat(indent)+
             'if(!bool($ctx_manager_exit'+num+'($err'+$loop_num+
             '.__class__.$factory,'+'$err'+$loop_num+
             ',getattr($err'+$loop_num+',"traceback"))))'
@@ -5459,7 +5473,7 @@ function $transition(context,token){
             return new $AbstractExprCtx(new_op,false)
           case 'augm_assign':
             if(context.expect===','){
-               return new $AbstractExprCtx(new $AugmentedAssignCtx(context,arguments[2]))
+               return new $AbstractExprCtx(new $AugmentedAssignCtx(context,arguments[2]),true)
             }
             break
           case '=':
@@ -5917,6 +5931,8 @@ function $transition(context,token){
             return new $ClassCtx(context)
           case 'continue':
             return new $ContinueCtx(context)
+          case '__debugger__':
+            return new $DebuggerCtx(context)
           case 'break':
             return new $BreakCtx(context)
           case 'def':
@@ -6307,7 +6323,7 @@ function $tokenize(src,module,locals_id,parent_block_id,line_info){
         "for","lambda","try","finally","raise","def","from",
         "nonlocal","while","del","global","with",
         "as","elif","else","if","yield","assert","import",
-        "except","raise","in","not","pass","with","continue"
+        "except","raise","in","not","pass","with","continue","__debugger__"
         //"False","None","True","continue",
         // "and',"or","is"
         ]
@@ -6714,16 +6730,17 @@ function $tokenize(src,module,locals_id,parent_block_id,line_info){
             var ends_line = false
             while(pos1<src.length){
                 var _s=src.charAt(pos1)
-                if(_s=='\n' || _s=='#'){ends_line=true;break
-                }else if(_s==' '){pos1++}
+                if(_s=='\n' || _s=='#'){ends_line=true;break}
+                else if(_s==' '){pos1++}
                 else{break}
             }
             if(ends_line){pos++;break}
+            
             new_node = new $Node()
-            new_node.indent = current.indent
+            new_node.indent = $get_node(context).indent
             new_node.line_num = lnum
             new_node.module = module
-            current.parent.add(new_node)
+            $get_node(context).parent.add(new_node)
             current = new_node
             context = new $NodeCtx(new_node)
             pos++
@@ -6808,15 +6825,7 @@ $B.py2js = function(src,module,locals_id,parent_block_id, line_info){
     var t0 = new Date().getTime()
   
     // Normalise line ends and script end
-    var src = src.replace(/\r\n/gm,'\n')
-    var $n=0
-    var _src=src.charAt(0)
-    var _src_length=src.length
-    while (_src_length>$n && (_src=="\n" || _src=="\r")){
-        $n++
-        _src=src.charAt($n)
-    }
-    src = src.substr($n)
+    src = src.replace(/\r\n/gm,'\n')
     if(src.charAt(src.length-1)!="\n"){src+='\n'}
 
     var locals_is_module = Array.isArray(locals_id)
@@ -6840,24 +6849,21 @@ $B.py2js = function(src,module,locals_id,parent_block_id, line_info){
     root.transform()
 
     // Create internal variables
-    var js = ['var $B=__BRYTHON__;\n'], pos=1
+    var js = ['var $B = __BRYTHON__;\n'], pos=1
     
-    js[pos++]= 'var __builtins__=_b_=$B.builtins;\n'
+    js[pos++]='eval(__BRYTHON__.InjectBuiltins());\n\n'
     
     if(locals_is_module){
-        js[pos++]= 'var '+local_ns+'=$locals_'+module+';'
+        js[pos]= 'var '+local_ns+'=$locals_'+module+', '
     }else{
-        js[pos++]='var '+local_ns+'=$B.imported["'+locals_id+'"] || {};'
+        js[pos]='var '+local_ns+'=$B.imported["'+locals_id+'"] || {}, '
     }
-    js[pos++]='var $locals='+local_ns+';\n'
+    js[pos++]+='$locals='+local_ns+';'
     
-    js[pos++]='$B.enter_frame(["'+locals_id+'", '+local_ns+','
-    js[pos++]='"'+module+'", '+global_ns+']);\n'
-    js[pos++]='eval($B.InjectBuiltins());\n'
-
     var new_node = new $Node()
     new $NodeJSCtx(new_node,js.join(''))
     root.insert(0,new_node)
+
     // module doc string
     var ds_node = new $Node()
     new $NodeJSCtx(ds_node, local_ns+'["__doc__"]='+(root.doc_string||'None')+';')
@@ -6877,6 +6883,9 @@ $B.py2js = function(src,module,locals_id,parent_block_id, line_info){
     var file_node = new $Node()
     new $NodeJSCtx(file_node,local_ns+'["__file__"]="'+$B.$py_module_path[module]+'";None;\n')
     root.insert(3,file_node)
+
+    root.insert(4, $NodeJS('$B.enter_frame(["'+locals_id+'", '+local_ns+','+
+        '"'+module+'", '+global_ns+']);\n'))
         
     if($B.debug>0){$add_line_num(root,null,module)}
     
@@ -6887,7 +6896,7 @@ $B.py2js = function(src,module,locals_id,parent_block_id, line_info){
     
     // leave frame at the end of module
     var new_node = new $Node()
-    new $NodeJSCtx(new_node,';$B.leave_frame("'+module+'");\n')
+    new $NodeJSCtx(new_node,'\n;$B.leave_frame("'+module+'");\n')
     root.add(new_node)
 
     return root
@@ -7145,6 +7154,7 @@ function brython(options){
                        // Run resulting Javascript
                        eval($js)
                     }
+                    $B.imported[module_name] = $locals
                     
                 }catch($err){
                     if($B.debug>1){

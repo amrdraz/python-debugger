@@ -201,7 +201,7 @@ function dir(obj){
     if(obj===undefined){
         // if dir is called without arguments, use globals
         var frame = $B.last($B.frames_stack),
-            globals_obj = frame[1][1],
+            globals_obj = frame[3],
             res = _b_.list(), pos=0
         for(var attr in globals_obj){
             if(attr.charAt(0)=='$' && attr.charAt(1) != '$') {
@@ -353,6 +353,7 @@ function $eval(src, _globals, _locals){
                 setitem(attr, ns[attr])
             }
         }
+        $B.imported[module_name] = ns
 
         // fixme: some extra variables are bleeding into locals...
         /*  This also causes issues for unittests */
@@ -602,6 +603,13 @@ function hash(obj){
        return obj.__hashvalue__=obj.__hash__()
     }
     var hashfunc = getattr(obj, '__hash__', _b_.None)
+
+    if (hashfunc == _b_.None) return $B.$py_next_hash++
+
+    if(hashfunc.$infos === undefined){
+        return obj.__hashvalue__ = hashfunc()
+    }
+
     // If no specific __hash__ method is supplied for the instance but
     // a __eq__ method is defined, the object is not hashable
     //
@@ -612,13 +620,14 @@ function hash(obj){
     // d = {A():1}
     //
     // throws an exception : unhashable type: 'A'
-    
-    if (hashfunc == _b_.None) return $B.$py_next_hash++
 
-    if(hashfunc.__func__===_b_.object.$dict.__hash__ &&
-        getattr(obj,'__eq__').__func__!==_b_.object.$dict.__eq__){
+    if(hashfunc.$infos.__func__===_b_.object.$dict.__hash__){
+        if(getattr(obj,'__eq__').$infos.__func__!==_b_.object.$dict.__eq__){
             throw _b_.TypeError("unhashable type: '"+
                 $B.get_class(obj).__name__+"'")
+        }else{
+            return $B.$py_next_hash++
+        }
     }else{
         return obj.__hashvalue__= hashfunc()
     }
@@ -934,12 +943,16 @@ function oct(x) {return $builtin_base_convert_helper(x, 8)}
 function ord(c) {
     //return String.charCodeAt(c)  <= this returns an undefined function error
     // see http://msdn.microsoft.com/en-us/library/ie/hza4d04f(v=vs.94).aspx
-    switch(typeof c) {
-      case 'string':
+    switch($B.get_class(c)) {
+      case _b_.str.$dict:
         if (c.length == 1) return c.charCodeAt(0)     // <= strobj.charCodeAt(index)
-        _b_.TypeError('ord() expected a character, but string of length ' + c.length + ' found') 
+        throw _b_.TypeError('ord() expected a character, but string of length ' + c.length + ' found') 
+      case _b_.bytes.$dict:
+      case _b_.bytearray.$dict:
+        if (c.source.length == 1) return c.source[0]     // <= strobj.charCodeAt(index)
+        throw _b_.TypeError('ord() expected a character, but string of length ' + c.source.length + ' found')       
       default:
-        _b_.TypeError('ord() expected a character, but ' + typeof(c) + ' was found') 
+        throw _b_.TypeError('ord() expected a character, but ' + $B.get_class(c).__name__ + ' was found') 
     }
 }
 
@@ -1061,14 +1074,34 @@ $RangeDict.__getitem__ = function(self,rank){
     return res   
 }
 
+$RangeIterator = function(obj){
+    return {__class__:$RangeIterator.$dict, obj: obj}
+}
+$RangeIterator.__class__ = $B.$factory
+$RangeIterator.$dict = {
+    __class__: $B.$type,
+    __name__: 'range_iterator',
+    $factory: $RangeIterator,
+    
+    __iter__: function(self){return self},
+    
+    __next__: function(self){return next(self.obj)}
+}
+$RangeIterator.$dict.__mro__ = [$RangeIterator.$dict, $ObjectDict]
+
 $RangeDict.__iter__ = function(self){
-    return {
+    var res = {
         __class__ : $RangeDict,
         start:self.start,
         stop:self.stop,
-        step:self.step,
-        $counter:self.start-self.step
+        step:self.step
     }
+    if(self.$safe){
+        res.$counter = self.start-self.step
+    }else{
+        res.$counter = $B.sub(self.start, self.step)
+    }
+    return $RangeIterator(res)
 }
 
 $RangeDict.__len__ = function(self){
@@ -1102,8 +1135,8 @@ $RangeDict.__reversed__ = function(self){
 }
 
 $RangeDict.__repr__ = $RangeDict.__str__ = function(self){
-    var res = 'range('+self.start+', '+self.stop
-    if(self.step!=1) res += ', '+self.step
+    var res = 'range('+_b_.str(self.start)+', '+_b_.str(self.stop)
+    if(self.step!=1) res += ', '+_b_.str(self.step)
     return res+')'
 }
 
@@ -1138,9 +1171,6 @@ function range(){
     }
     res.$safe = (typeof start=='number' && typeof stop=='number' &&
         typeof step=='number')
-    res.__repr__ = res.__str__ = function(){
-            return 'range('+start+','+stop+(args.length>=3 ? ','+step : '')+')'
-        }
     return res
 }
 range.__class__ = $B.$factory
@@ -1159,7 +1189,7 @@ function repr(obj){
         return func(obj)
     }
     var func = getattr(obj,'__repr__')
-    if(func!==undefined) return func(obj)
+    if(func!==undefined){return func()}
     throw _b_.AttributeError("object has no attribute __repr__")
 }
 
@@ -1279,6 +1309,12 @@ function setattr(obj,attr,value){
             __set__.apply(res,[obj,value]);return None
         }
     }
+
+    // Use __slots__ if defined
+    if(klass && klass.$slots && klass.$slots[attr]===undefined){
+        throw _b_.AttributeError("'"+klass.__name__+"' object has no attribute'"+
+            attr+"'")
+    }
     
     // Search the __setattr__ method
     var setattr=false
@@ -1288,6 +1324,7 @@ function setattr(obj,attr,value){
             if(setattr){break}
         }
     }
+    
     if(!setattr){obj[attr]=value}else{setattr(obj,attr,value)}
     return None
 }

@@ -125,74 +125,57 @@ function divmod_pos(v1, v2){
     return [LongInt(quotient), mod]
 }
 
-function mul_pos(v1, v2){
-    // Multiply positive numbers v1 by v2
-    // Make v2 smaller than v1
-    if(v1.length<v2.length){var a=v1; v1=v2 ; v2=a}
-    if(v2=='0'){return LongInt('0')}
-    var cols = {}, i=v2.length, j
+function split_chunks(s, size){
+    var nb = Math.ceil(s.length/size), chunks = [], len=s.length
+    for(var i=0;i<nb;i++){
+        var pos = len-size*(i+1)
+        if(pos<0){size += pos; pos=0}
+        chunks.push(parseInt(s.substr(pos, size)))
+    }
+    return chunks
+}
+
+function mul_pos(x, y){
+    // To multiply long integers in strings x and y, split the strings in
+    // chunks of chunk_size digits to get integers than can be safely
+    // multiplied by Javascript
+    var chunk_size = 6
+    var cx = split_chunks(x, chunk_size), cy = split_chunks(y, chunk_size)
     
-    // Built the object "cols", indexed by integers from 1 to nb1+nb2-2
-    // where nb1 and nb2 are the number of digits in v1 and v2.
-    // cols[n] is the sum of v1[i]*v2[j] for i+j = n
-    
-    while(i--){
-        var car = v2.charAt(i)
-        if(car=="0"){
-            j = v1.length
-            while(j--){
-                if(cols[i+j]===undefined){cols[i+j]=0}
-            }        
-        }else if(car=="1"){
-            j = v1.length
-            while(j--){
-                var z = parseInt(v1.charAt(j))
-                if(cols[i+j]===undefined){cols[i+j]=z}
-                else{cols[i+j] += z}
-            }
-        }else{
-            var x = parseInt(car), j = v1.length, y, z
-            while(j--){
-                y = x * parseInt(v1.charAt(j))
-                if(cols[i+j]===undefined){cols[i+j]=y}
-                else{cols[i+j] += y}
-            }
+    // Multiply chunk i of x by chunk j of y and store the result in an
+    // object "products" at index i+j
+    // The value of products[pos] is the sum of x[i]*y[j] for i+j = pos
+    var products = {}, len = cx.length+cy.length
+    for(var i=0;i<len-1;i++){products[i]=0}
+    for(var i=0;i<cx.length;i++){
+        for(var j=0;j<cy.length;j++){
+            products[i+j] += cx[i]*cy[j]
         }
     }
 
-    // Transform cols so that cols[x] is a one-digit integers
-    i = v1.length+v2.length-1
-    while(i--){
-        var col = cols[i].toString()
-        if(col.length>1){
-            // If the value in cols[i] has more than one digit, only keep the
-            // last one and report the others at the right index
-            // For instance if cols[i] = 123, keep 3 in cols[i], add 2 to
-            // cols[i-1] and 1 to cols[i-2]
-            cols[i] = parseInt(col.charAt(col.length-1))
-            j = col.length
-            while(j-->1){
-                var report = parseInt(col.charAt(j-1))
-                var pos = i-col.length+j
-                if(cols[pos]===undefined){cols[pos]=report}
-                else{cols[pos] += report}
-            }
+    // If products[pos] has more digits than chunk_size, report the carry
+    // at position pos+1
+    var nb = len-1
+    for(var i=0;i<len-1;i++){
+        var chunks = split_chunks(products[i].toString(), chunk_size)
+        for(var j=1;j<chunks.length;j++){
+            pos = i+j
+            if(products[pos]===undefined){products[pos]=parseInt(chunks[j]);nb=pos}
+            else{products[pos] += parseInt(chunks[j])}
         }
+        products[i] = chunks[0]
     }
 
-    // Find minimum index in cols
-    // The previous loop may have introduced negative indices
-    var imin
-    for(var attr in cols){
-        i = parseInt(attr)
-        if(imin===undefined){imin=i}
-        else if(i<imin){imin=i}
+    // Build the result as the concatenation of strings, padded with 0 if
+    // necessary
+    var result = '', i=0, s
+    while(products[i]!==undefined){
+        s = products[i].toString()
+        if(products[i+1]!==undefined){s='0'.repeat(chunk_size-s.length)+s}
+        result = s+result;
+        i++
     }
-
-    // Result is the concatenation of digits in cols
-    var res = ''
-    for(var i=imin;i<=v1.length+v2.length-2;i++){res+=cols[i].toString()}
-    return LongInt(res)
+    return LongInt(result)
 }
 
 function sub_pos(v1, v2){
@@ -323,6 +306,10 @@ $LongIntDict.__eq__ = function(self, other){
     return self.value==other.value && self.pos==other.pos
 }
 
+$LongIntDict.__float__ = function(self){
+    return new Number(parseFloat(self.value))
+}
+
 $LongIntDict.__floordiv__ = function(self, other){
     if(isinstance(other, _b_.float)){
         return _b_.float(parseInt(self.value)/other)
@@ -333,9 +320,10 @@ $LongIntDict.__floordiv__ = function(self, other){
 
 $LongIntDict.__ge__ = function(self, other){
     if (typeof other == 'number') other=LongInt(_b_.str(other))
-    if(self.value.length>other.value.length){return true}
-    else if(self.value.length<other.value.length){return false}
-    else{return self.value >= other.value}
+    if(self.pos != other.pos){return !other.pos}
+    if(self.value.length>other.value.length){return self.pos}
+    else if(self.value.length<other.value.length){return !self.pos}
+    else{return self.pos ? self.value >= other.value : self.value <= other.value}
 }
 
 $LongIntDict.__gt__ = function(self, other){
@@ -366,9 +354,10 @@ $LongIntDict.__invert__ = function(self){
 
 $LongIntDict.__le__ = function(self, other){
     if (typeof other == 'number') other=LongInt(_b_.str(other))
-    if(self.value.length>other.value.length){return false}
-    else if(self.value.length<other.value.length){return true}
-    else{return self.value <= other.value}
+    if(self.pos !== other.pos){return !self.pos}
+    if(self.value.length>other.value.length){return !self.pos}
+    else if(self.value.length<other.value.length){return self.pos}
+    else{return self.pos ? self.value <= other.value : self.value >= other.value}
 }
 
 $LongIntDict.__lt__ = function(self, other){
@@ -376,8 +365,18 @@ $LongIntDict.__lt__ = function(self, other){
 }
 
 $LongIntDict.__lshift__ = function(self, shift){
-    shift = LongInt(shift)
-    if(shift.value=='0'){return self}
+    var is_long = shift.__class__==$LongIntDict
+    if(is_long){
+        var shift_value = parseInt(shift.value)
+        if(shift_value<0){throw _b_.ValueError('negative shift count')}
+        if(shift_value < $B.max_int){shift_safe=true;shift = shift_value}
+    }
+    if(shift_safe){
+        if(shift_value==0){return self}
+    }else{
+        shift = LongInt(shift)
+        if(shift.value=='0'){return self}
+    }
     var res = self.value
     while(true){
         var x, carry=0, res1=''
@@ -388,8 +387,13 @@ $LongIntDict.__lshift__ = function(self, shift){
         }
         if(carry){res1=carry+res1}
         res=res1
-        shift = sub_pos(shift.value, '1')
-        if(shift.value=='0'){break}
+        if(shift_safe){
+            shift--
+            if(shift==0){break}
+        }else{
+            shift = sub_pos(shift.value, '1')
+            if(shift.value=='0'){break}
+        }
     }
     return intOrLong({__class__:$LongIntDict, value:res, pos:self.pos})
 }
@@ -402,7 +406,7 @@ $LongIntDict.__mro__ = [$LongIntDict, _b_.int.$dict, _b_.object.$dict]
 
 $LongIntDict.__mul__ = function(self, other){
     if(isinstance(other, _b_.float)){
-        return _b_.float(parseInt(self.value)*other.value)
+        return _b_.float(parseInt(self.value)*other)
     }
     if (typeof other == 'number') other=LongInt(_b_.str(other))
     var res = mul_pos(self.value, other.value)
@@ -606,14 +610,16 @@ function LongInt(value, base){
         throw ValueError("LongInt() base must be >= 2 and <= 36")
     }
     if(isinstance(value, _b_.float)){
-        if(value>=0){value=Math.round(value.value)}
-        else{value=Math.ceil(value.value)}
+        console.log('arg is float', value)
+        if(value>=0){value=new Number(Math.round(value.value))}
+        else{value=new Number(Math.ceil(value.value))}
     } else if(isinstance(value, _b_.bool)){
         if (value.valueOf()) return int(1)
         return int(0)
     }
     if(typeof value=='number'){
         if(isSafeInteger(value)){value = value.toString()}
+        else if(value.constructor == Number){console.log('big number', value);value = value.toString()}
         else{console.log('wrong value', value);throw ValueError("argument of long_int is not a safe integer")}
     }else if(value.__class__===$LongIntDict){return value}
     else if(isinstance(value,_b_.bool)){value=_b_.bool.$dict.__int__(value)+''}

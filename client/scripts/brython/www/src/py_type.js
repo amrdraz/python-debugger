@@ -35,14 +35,27 @@ $B.$class_constructor = function(class_name,class_obj,parents,parents_names,kwar
         __bases__ : bases,
         __dict__ : cl_dict
     }
- 
+
     // set class attributes for faster lookups
-    var items = _b_.list(_b_.dict.$dict.items(cl_dict))
+    var items = $B.$dict_items(cl_dict);
     for(var i=0;i<items.length;i++){
         class_dict[items[i][0]] = items[i][1]
     }
 
     class_dict.__mro__ = [class_dict].concat(make_mro(bases, cl_dict))
+    
+    // Check if class has __slots__
+    var slots = []
+    for(var i=0;i<class_dict.__mro__.length;i++){
+        var _slots = class_dict.__mro__[i].__slots__
+        if(_slots!==undefined){
+            _slots = _b_.list(_slots)
+            for(var j=0;j<_slots.length;j++){
+                cl_dict.$slots = cl_dict.$slots || {}
+                cl_dict.$slots[_slots[j]]=class_dict.__mro__[i]
+            }
+        }
+    }
 
     // If no metaclass is specified for the class, see if one of the parents 
     // has a metaclass set
@@ -276,11 +289,12 @@ $B.$type.__new__ = function(cls, name, bases, cl_dict){
         __name__ : name.replace('$$',''),
         __bases__ : bases,
         __dict__ : cl_dict,
-        $methods : {}
+        $methods : {},
+        $slots: cl_dict.$slots
     }
- 
+
     // set class attributes for faster lookups
-    var items = _b_.list(_b_.dict.$dict.items(cl_dict))
+    var items = $B.$dict_items(cl_dict);
     for(var i=0;i<items.length;i++){
         var name=items[i][0], v=items[i][1]
         class_dict[name] = v
@@ -402,7 +416,11 @@ $B.$type.__getattribute__=function(klass,attr){
             }
         }
     }
-
+        
+    if(res===undefined && klass.$slots && klass.$slots[attr]!==undefined){
+        return member_descriptor(klass.$slots[attr], attr)
+    }
+    
     if(res!==undefined){
 
         // If the attribute is a property, return it
@@ -547,6 +565,21 @@ function $instance_creator(klass){
     }
 }
 
+// Used for class members, defined in __slots__
+function member_descriptor(klass, attr){
+    return {__class__:member_descriptor.$dict, klass: klass, attr: attr}
+}
+member_descriptor.__class__ = $B.$factory
+member_descriptor.$dict = {
+    __class__: $B.$type,
+    __name__: 'member_descriptor',
+    $factory: member_descriptor,
+    
+    __str__: function(self){
+        return "<member '"+self.attr+"' of '"+self.klass.__name__+
+        "' objects>"}
+}
+member_descriptor.$dict.__mro__ = [member_descriptor.$dict , _b_.object.$dict]
 
 // used as the factory for method objects
 function $MethodFactory(){}
