@@ -5,6 +5,8 @@
         stop_debugger: stopDebugger,
         step_debugger: stepDebugger,
         step_back_debugger: stepBackRecording,
+        step_to_last_step: setStepToLast,
+        step_to_first_step: setStepToFirst,
         can_step: canStep,
         set_step: setStep,
         set_no_input_trace: setNoInputTrace,
@@ -16,9 +18,13 @@
         is_executing: isExecuting,
         is_last_step: isLastStep,
         is_first_step: isFirstStep,
+        did_error_occure: getDidErrorOccure,
+        get_session: getSessionHistory,
         get_current_step: getStep,
         get_current_state: getCurrentState,
         get_recorded_states: getRecordedStates,
+        unset_events: unsetCallbacks,
+        reset_events: resetCallbacks,
         on_input_while_debugging: callbackSetter('handleInput'),
         on_debugging_started: callbackSetter('debugStarted'),
         on_debugging_end: callbackSetter('debugEnded'),
@@ -36,6 +42,7 @@
     var myInterpreter = null;
 
     var isRecorded = false;
+    var didErrorOccure = false;
     var weStopDebugOnRuntimeError = false;
     var parserReturn = null; // object returned when done parsing
     var recordedStates = [];
@@ -47,6 +54,7 @@
 
     var events = ['stepUpdate', 'debugStarted', 'debugError', 'debugEnded', 'handleInput'];
     var callbacks = {};
+    var temp_callbacks = {};
     events.forEach(function(key) {
         callbacks[key] = noop;
     });
@@ -62,6 +70,22 @@
         return function(cb) {
             callbacks[key] = cb;
         };
+    }
+
+    /**
+     * temporarely remove callback in order to stop updating who ever is listening
+     */
+    function unsetCallbacks() {
+        temp_callbacks = callbacks;
+        events.forEach(function(key) {
+            callbacks[key] = noop;
+        });
+    }
+    /**
+     * re set callback after unset
+     */
+    function resetCallbacks() {
+        callbacks = temp_callbacks;
     }
 
     /**
@@ -91,6 +115,17 @@
         return isRecorded;
     }
 
+    /**
+     * If an error is thrown during the debugging session this value is true
+     * @return {Boolean}
+     */
+    function getDidErrorOccure() {
+        return didErrorOccure;
+    }
+    /**
+     * Is this a debugging session active
+     * @return {Boolean} 
+     */
     function isDebugging() {
         return debugging;
     }
@@ -120,7 +155,15 @@
      * @param {Numebr} n limit default 100000
      */
     function setStepLimit(n) {
-        stepLimit = (n===undefined)?10000:n;
+        stepLimit = (n === undefined) ? 10000 : n;
+    }
+
+    function setStepToLast() {
+        setStep(recordedStates.length - 1);
+    }
+
+    function setStepToFirst() {
+        setStep(0);
     }
 
     /**
@@ -173,7 +216,7 @@
      * @param  {String} arg String to show user
      * @return {String}     Value of input
      */
-    callbacks['handleInput'] = function  handleInput(arg) {
+    callbacks['handleInput'] = function handleInput(arg) {
         return _b_.input(arg);
     };
 
@@ -216,7 +259,7 @@
      * Fire when exiting debug mode
      */
     function stopDebugger() {
-        if(debugging) {
+        if (debugging) {
             debugging = false;
             resetOutErr();
             callbacks.debugEnded(Debugger);
@@ -227,26 +270,33 @@
      * Fire when an error occurrs while parsing or during runtime
      */
     function errorWhileDebugging(err) {
+        var info = "";
+        try {
+            info = _b_.getattr(err, 'info');
+        } catch (er) {
+            // guess it doesn't work here
+        }
         var trace = {
             event: 'line',
             type: 'runtime_error',
-            data: _b_.getattr(err, 'info') + '\n' + _b_.getattr(err, '__name__') + ": " +err.$message + '\n', 
+            data: info + '\n' + _b_.getattr(err, '__name__') + ": " + err.$message + '\n',
             stack: err.$stack,
             message: err.$message,
             name: _b_.getattr(err, '__name__'),
             frame: $B.last(err.$stack),
             err: err,
-            step: getRecordedStates().length -1,
+            step: getRecordedStates().length - 1,
             line_no: +($B.last(err.$stack)[1].$line_info.split(',')[0]),
             next_line_no: +($B.last(err.$stack)[1].$line_info.split(',')[0]),
             module_name: +($B.last(err.$stack)[1].$line_info.split(',')[1])
         };
+        didErrorOccure = true;
         if (getRecordedStates().length > 0) {
-            if(getRecordedStates().length>=stepLimit) {
+            if (getRecordedStates().length >= stepLimit) {
                 trace.type = 'infinit_loop';
                 recordedStates.push(trace);
             } else {
-                setTrace(trace);   
+                setTrace(trace);
             }
         } else {
             trace.type = 'syntax_error';
@@ -310,7 +360,7 @@
             return;
         }
         if (state.type === 'runtime_error') {
-           setErrorState(state);
+            setErrorState(state);
         }
         recordedStates.push(state);
     }
@@ -345,12 +395,12 @@
         state.event = 'line';
         state.type = 'input';
         state.id = state.id + recordedStates.length;
-        if (recordedInputs[state.id]!==undefined) {
+        if (recordedInputs[state.id] !== undefined) {
             return recordedInputs[state.id];
-        } else if(stdInChanged()) {
+        } else if (stdInChanged()) {
             // ignore input trace until it's back to the original
             // by handeling input now
-            return callbacks['handleInput'](state.arg); 
+            return callbacks['handleInput'](state.arg);
         } else {
             state.line_no = getLastRecordedState().line_no;
             state.frame = getLastRecordedState().frame;
@@ -365,7 +415,7 @@
      * @return {Boolean} whether stdIn was changed while running the code
      */
     function stdInChanged() {
-        return $B.imported.sys.stdin !== $B.modules._sys.stdin;
+        return $B.imported.sys?$B.imported.sys.stdin !== $B.modules._sys.stdin:false;
     }
 
     /**
@@ -376,7 +426,7 @@
      */
     function isDisposableState(state) {
         var disposable = ['afterwhile', 'eof'];
-        return disposable[state.type]!==undefined;
+        return disposable[state.type] !== undefined;
     }
 
     function resetDebugger(rerun) {
@@ -384,6 +434,7 @@
         recordedOut = [];
         recordedErr = [];
         if (!rerun) {
+            didErrorOccure = false;
             isRecorded = false;
             currentStep = 0;
             recordedInputs = {};
@@ -613,7 +664,7 @@
         newCode += ';$B.leave_frame(' + codesplit[1];
 
         //  inject input trace if applicable
-        if(!noInputTrace) {
+        if (!noInputTrace) {
             var re = new RegExp(INPUT_RGX.source, 'g');
             var inputLine = getNextInput(newCode, re);
             while (inputLine !== null) {
@@ -717,16 +768,15 @@
 
     /**
      * Run Code without trace
-     * @param  {[type]} code [description]
-     * @return {[type]}      [description]
+     * @param  {String} code code to run
      */
-    function runNoTrace (code) {
+    function runNoTrace(code) {
         resetDebugger();
         var module_name = '__main__';
         $B.$py_module_path[module_name] = window.location.href;
         try {
             var root = $B.py2js(code, module_name, module_name, '__builtins__');
-            
+
             var js = root.to_js();
             if ($B.debug > 1) {
                 console.log(js);
@@ -762,7 +812,7 @@
      * @return {Interpreter} instence of Interpreter
      */
     function interpretCode(obj) {
-        initAPI = defineAPIScope(obj);
+        var initAPI = defineAPIScope(obj);
         return new Interpreter(obj.code, initAPI);
     }
 
@@ -804,6 +854,31 @@
                 interpreter.createNativeFunction(wrapper));
 
         };
+    }
+
+    function getSessionHistory() {
+        var last_state = getLastRecordedState();
+        if (last_state) {
+            return {
+                states: getRecordedStates(),
+                prints: recordedOut,
+                stdout: last_state.stdout,
+                locals: last_state.frame[1],
+                globals: last_state.frame[3],
+                error: didErrorOccure
+            };
+        } else {
+            return {
+                states:[],
+                prints:[],
+                stdout:"SyntaxError In Code",
+                stderr:"SyntaxError In Code",
+                locals:{},
+                globals:{},
+                error: didErrorOccure,
+            };
+        }
+        
     }
 
     var realStdOut = $B.stdout;

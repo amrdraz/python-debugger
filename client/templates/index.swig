@@ -51,4 +51,6 @@
     <script src="bower_components/codemirror/mode/python/python.js" type="text/javascript" charset="utf-8"></script>
     <script src="bower_components/codemirror/addon/edit/matchbrackets.js" type="text/javascript" charset="utf-8"></script>
     <script src="bower_components/codemirror/addon/selection/active-line.js" type="text/javascript" charset="utf-8"></script>
+    <script src="scripts/cm-lint-custom.js" type="text/javascript" charset="utf-8"></script>
+    <script src="scripts/cm-lint-result.js" type="text/javascript" charset="utf-8"></script>
 {% endblock %}

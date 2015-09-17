@@ -1,19 +1,26 @@
 // example of using the brython debugger without initializing brython in body
 (function() {
-    brython(1);
+    window.brython(1);
 
+    var $B = window.__BRYTHON__;
+    var _b_ = $B.builtins;
+    var $io = {
+        __class__: $B.$type,
+        __name__: 'io'
+    };
+    $io.__mro__ = [$io, _b_.object.$dict];
 
     var doc = function(d) {
         return document.getElementById(d);
     };
-    var $B = __BRYTHON__;
-    var _b_ = $B.builtins;
 
-    var editor = CodeMirror.fromTextArea(doc("editor"), {
+    var editor = window.CodeMirror.fromTextArea(doc("editor"), {
         autofocus: true,
         lineNumbers: true,
         indentUnits: 4,
         lineWrapping: true,
+        gutters: ["CodeMirror-lint-markers", "CodeMirror-linenumbers"],
+        lint:{},
         styleActiveLine: true,
         mode: {
             name: "python",
@@ -42,15 +49,13 @@
         });
     }
 
+    function clearLint () {
+        editor.updateLinting([]);
+    }
+
     reset_src();
 
     var Debugger = window.Brython_Debugger;
-
-    var $io = {
-        __class__: $B.$type,
-        __name__: 'io'
-    };
-    $io.__mro__ = [$io, _b_.object.$dict];
     var cout = {
         __class__: $io,
         write: function(data) {
@@ -59,52 +64,51 @@
         },
         flush: function() {}
     };
-
-    $B.stdout = cout;
-    $B.stderr = cout;
+    $B.stdout = $B.modules._sys.stdin = cout;
+    $B.stderr = $B.modules._sys.stdin = cout;
+    $B.stdin = $B.modules._sys.stdin = {
+        __class__: $io,
+        __original__: true,
+        closed: false,
+        len: 1,
+        pos: 0,
+        read: function() {
+            return prompt();
+        },
+        readline: function() {
+            return prompt();
+        }
+    };
+    _b_.input = function input(arg) {
+        var val;
+        var stdin = ($B.imported.sys && $B.imported.sys.stdin || $B.stdin);
+        // $B.stdout.write(arg);
+        if (stdin.__original__) {
+            val = prompt(arg)
+            return val?val:"";
+        }
+        val = _b_.getattr(stdin, 'readline')();
+        val = val.split('\n')[0];
+        if (stdin.len === stdin.pos) {
+            _b_.getattr(stdin, 'close')();
+        }
+        // $B.stdout.write(val+'\n');
+        return val;
+    };
 
     function run() {
         doc("console").value = '';
+        clearLint();
         var src = editor.getValue();
         if (storage) {
             storage["py_src"] = src;
         }
-        var t0 = Date.now();
-        var module_name = '__main__';
-        $B.$py_module_path[module_name] = window.location.href;
-        try {
-            var root = $B.py2js(src, module_name, module_name, '__builtins__')
-                //earney
-            var js = root.to_js();
-            if ($B.debug > 1) {
-                console.log(js);
-            }
-
-            if ($B.async_enabled) {
-                js = $B.execution_object.source_conversion(js);
-
-                //console.log(js)
-                eval(js);
-            } else {
-                // Run resulting Javascript
-                eval(js);
-            }
-        } catch (exc) {
-            $B.leave_frame();
-            $B.leave_frame();
-            if (exc.$py_error) {
-                doc("console").value += _b_.getattr(exc, 'info') + '\n' + _b_.getattr(exc, '__name__') + ": " + exc.$message + '\n';
-            } else {
-                throw exc;
-            }
-        }
-        output = doc("console").value;
-
-        doc("console").value += ('<completed in ' + ((Date.now() - t0) * 1000.0) + ' ms >');
+        Debugger.run_no_debugger(src);
     }
 
     function start_debugger(ev) {
         doc("console").value = '';
+        clearLint();
         var src = editor.getValue();
         if (storage) {
             storage["py_src"] = src;
@@ -177,6 +181,11 @@
             doc('console').value = err.data;
             Debugger.stop_debugger();
         }
+
+        err.column_no_start = 0;
+        err.column_no_stop = 200;
+        err.severity = 'error';
+        editor.updateLinting(CodeMirror.lintResult([err]));
     }
 
     function show_js(ev) {

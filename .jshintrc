@@ -26,29 +26,12 @@
   "expr": true,
   "maxerr": 100,
   "predef": [
-    "require",
-    "define",
-    "afterEach",
-    "beforeEach",
-    "confirm",
-    "context",
-    "describe",
-    "expect",
-    "it",
-    "jasmine",
-    "JSHINT",
-    "mostRecentAjaxRequest",
-    "qq",
-    "runs",
-    "spyOn",
-    "spyOnEvent",
-    "waitsFor",
-    "xdescribe"
+    "__BRYTHON__",
   ],
   "globals": {
     "$": true,
     "Modernizr": true,
     "jQuery": true
   },
-  "indent": 2
+  "indent": 4
 }

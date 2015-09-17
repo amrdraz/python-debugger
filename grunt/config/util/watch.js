@@ -62,7 +62,7 @@ var taskConfig = function(grunt) {
         '<%= yeogurt.client %>/scripts/**/*.js'
       ],
       tasks: [
-        'newer:jshint'
+        // 'newer:jshint'
       ]
     },
     livereload: {
