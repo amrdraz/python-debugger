@@ -434,11 +434,11 @@
     }
 
     /**
-     * detect whether stdin changed
+     * detect whether stdin changed by using the sys module
      * @return {Boolean} whether stdIn was changed while running the code
      */
     function stdInChanged() {
-        return $B.imported.sys.stdin !== $B.modules._sys.stdin;
+        return $B.imported.sys?($B.imported.sys.stdin !== $B.modules._sys.stdin):false;
     }
 
     /**
@@ -799,8 +799,7 @@
 
     /**
      * Run Code without trace
-     * @param  {[type]} code [description]
-     * @return {[type]}      [description]
+     * @param  {String} code to run
      */
     function runNoTrace(code) {
         resetDebugger();
