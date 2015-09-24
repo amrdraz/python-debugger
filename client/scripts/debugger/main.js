@@ -10,6 +10,7 @@
         can_step: canStep,
         set_step: setStep,
         set_no_input_trace: setNoInputTrace,
+        set_no_suppress_out: setNoSuppressOut,
         set_trace: setTrace,
         set_trace_call: setTraceCall,
         set_step_limit: setStepLimit,
@@ -35,6 +36,7 @@
     var _b_ = $B.builtins;
     var traceCall = 'Brython_Debugger.set_trace';
     var noInputTrace = false;
+    var noSuppressOut = false;
     var debugging = false; // flag indecting debugger was started
     var stepLimit = 10000; // Solving the halting problem by limiting the number of steps to run
 
@@ -44,6 +46,7 @@
     var isRecorded = false;
     var didErrorOccure = false;
     var weStopDebugOnRuntimeError = false;
+    var errorState = null;
     var parserReturn = null; // object returned when done parsing
     var recordedStates = [];
     var recordedInputs = {};
@@ -54,10 +57,20 @@
 
     var events = ['stepUpdate', 'debugStarted', 'debugError', 'debugEnded', 'handleInput'];
     var callbacks = {};
-    var temp_callbacks = {};
+    var default_callbacks = {};
+    var temp_callbacks = null;
     events.forEach(function(key) {
-        callbacks[key] = noop;
+        default_callbacks[key] = callbacks[key] = noop;
     });
+    /**
+     * Dfault function to handle input while debugging
+     * can be replaced externallyfrom this default
+     * @param  {String} arg String to show user
+     * @return {String}     Value of input
+     */
+    default_callbacks['handleInput'] = callbacks['handleInput'] = function handleInput(arg) {
+        return _b_.input(arg);
+    };
 
     // used in trace injection
     var LINE_RGX = /^( *);\$locals\.\$line_info=\"(\d+),(.+)\";/m;
@@ -76,16 +89,19 @@
      * temporarely remove callback in order to stop updating who ever is listening
      */
     function unsetCallbacks() {
-        temp_callbacks = callbacks;
-        events.forEach(function(key) {
-            callbacks[key] = noop;
-        });
+        if(temp_callbacks===null) {
+            temp_callbacks = callbacks;
+            callbacks = default_callbacks;
+        }
     }
     /**
      * re set callback after unset
      */
     function resetCallbacks() {
-        callbacks = temp_callbacks;
+        if(temp_callbacks!==null) {
+            callbacks = temp_callbacks;
+            temp_callbacks = null;
+        }
     }
 
     /**
@@ -105,6 +121,16 @@
      */
     function setNoInputTrace(bool) {
         noInputTrace = bool;
+    }
+
+    /**
+     * Set the value of noInputTrace
+     * a flag that stops the debugger from injecting input trace calls into the code
+     * will cause the program to stop if you're in record more and did not change the default input function or input stream
+     * @param {Boolean} bool wheather input trace calls should be injected into the code
+     */
+    function setNoSuppressOut(bool) {
+        noSuppressOut = bool;
     }
 
     /**
@@ -138,6 +164,10 @@
         return currentStep;
     }
 
+    function getErrorState() {
+        return errorState;
+    }
+
     function getRecordedStates() {
         return recordedStates;
     }
@@ -147,7 +177,7 @@
     }
 
     function getCurrentState() {
-        return currentState;
+        return recordedStates[currentStep];
     }
 
     /**
@@ -211,16 +241,6 @@
     }
 
     /**
-     * Dfault function to handle input while debugging
-     * can be replaced externallyfrom this default
-     * @param  {String} arg String to show user
-     * @return {String}     Value of input
-     */
-    callbacks['handleInput'] = function handleInput(arg) {
-        return _b_.input(arg);
-    };
-
-    /**
      * Is this last step
      * @return {Boolean} [description]
      */
@@ -250,7 +270,7 @@
      * In live mode currentStep is useually the last
      */
     function updateStep() {
-        currentState = recordedStates[currentStep];
+        var currentState = getCurrentState();
         callbacks.stepUpdate(currentState);
     }
 
@@ -274,7 +294,7 @@
         try {
             info = _b_.getattr(err, 'info');
         } catch (er) {
-            // guess it doesn't work here
+            // guess it doesn't work here, sometimes info doesn't exist when you have a syntax error
         }
         var trace = {
             event: 'line',
@@ -286,13 +306,15 @@
             frame: $B.last(err.$stack),
             err: err,
             step: getRecordedStates().length - 1,
-            line_no: +($B.last(err.$stack)[1].$line_info.split(',')[0]),
-            next_line_no: +($B.last(err.$stack)[1].$line_info.split(',')[0]),
-            module_name: +($B.last(err.$stack)[1].$line_info.split(',')[1])
         };
+        trace.stdout = (getLastRecordedState()?getLastRecordedState().stdout:'') + trace.data;
+        trace.module_name = trace.frame[0];
+        trace.line_no = trace.next_line_no = +($B.last(err.$stack)[1].$line_info.split(',')[0]);
         didErrorOccure = true;
         if (getRecordedStates().length > 0) {
             if (getRecordedStates().length >= stepLimit) {
+                trace.name = "StepLimitExceededError";
+                trace.stdout = trace.data = info + '\n' + trace.name + ": " + trace.message + '\n';
                 trace.type = 'infinit_loop';
                 recordedStates.push(trace);
             } else {
@@ -301,7 +323,12 @@
         } else {
             trace.type = 'syntax_error';
         }
+        setErrorState(trace);
         callbacks.debugError(trace, Debugger);
+    }
+
+    function setErrorState(state) {
+        errorState = state;
     }
 
     /**
@@ -313,7 +340,7 @@
         // replace by event
 
         if (recordedStates.length > stepLimit) {
-            throw $B.exception("You have exceeded the amount of steps allowed by this debugger, you probably have an infinit loop or you're running a long program");
+            throw $B.exception("You have exceeded the amount of steps allowed for this program, you probably have an infinit loop or you're running a long program");
             // you can change the limit by using the setStepLimit method variable form the default
             // The debugger is not meant to debug long pieces of code so that should be taken into consideration
         }
@@ -360,14 +387,10 @@
             return;
         }
         if (state.type === 'runtime_error') {
-            setErrorState(state);
+            recordedStates.pop();
+            state.stdout += state.data;
         }
         recordedStates.push(state);
-    }
-
-    function setErrorState(state) {
-        recordedStates.pop();
-        state.stdout += state.data;
     }
 
     function setdStdOutTrace(state) {
@@ -415,7 +438,7 @@
      * @return {Boolean} whether stdIn was changed while running the code
      */
     function stdInChanged() {
-        return $B.imported.sys?$B.imported.sys.stdin !== $B.modules._sys.stdin:false;
+        return $B.imported.sys.stdin !== $B.modules._sys.stdin;
     }
 
     /**
@@ -439,6 +462,7 @@
             currentStep = 0;
             recordedInputs = {};
             parserReturn = null;
+            errorState = null;
         }
     }
 
@@ -505,7 +529,7 @@
     function rerunCode() {
         resetDebugger(true);
         try {
-            setOutErr(true);
+            setOutErr();
             runTrace(parserReturn);
         } catch (err) {
             handleDebugError(err);
@@ -516,16 +540,16 @@
 
     /**
      * Initialises the debugger, setup code for debugging, and either run interpreter or record run
-     * @param  {String} src optional code to be passed, if not passed will be read from the set editor
+     * @param  {String} src optional code to be passed, if default is an empty string
      * @param  {Boolean} whether to run recording then replay or step
      */
     function startDebugger(src, record) {
-        var code = src || getEditor().getValue() || "";
+        var code = src || "";
         resetDebugger();
 
         isRecorded = record === undefined ? true : record;
 
-        setOutErr(record);
+        setOutErr(noSuppressOut);
         try {
             var obj = parserReturn = parseCode(code);
 
@@ -556,6 +580,12 @@
         }
     }
 
+    /**
+     * return true if eror was thrown by debugger in order to HULT
+     * the purpose of this behavior is to stop running the program up until some function that demands user intraction
+     * @param  {Object} err [description]
+     * @return {Boolean}     [description]
+     */
     function wasHalted(err) {
         return err.$message === ('<' + HALT + '>');
     }
@@ -578,7 +608,7 @@
     function pythonToBrythonJS(src) {
         var obj = {
             code: ""
-        };
+        }, local_name, current_globals_id, current_locals_name, current_globals_name;
         // Initialize global and local module scope
         var current_frame = $B.frames_stack[$B.frames_stack.length - 1];
         var module_name;
@@ -589,9 +619,9 @@
             local_name = '__builtins__';
         } else {
             var current_locals_id = current_frame[0];
-            var current_locals_name = current_locals_id.replace(/\./, '_');
-            var current_globals_id = current_frame[2] || current_locals_id;
-            var current_globals_name = current_globals_id.replace(/\./, '_');
+            current_locals_name = current_locals_id.replace(/\./, '_');
+            current_globals_id = current_frame[2] || current_locals_id;
+            current_globals_name = current_globals_id.replace(/\./, '_');
             var _globals = _b_.dict([]);
             module_name = _b_.dict.$dict.get(_globals, '__name__', 'exec_' + $B.UUID());
             $B.$py_module_path[module_name] = $B.$py_module_path[current_globals_id];
@@ -599,14 +629,14 @@
         }
 
         obj.module_name = module_name;
-        if (!$B.async_enabled) obj[module_name] = {};
+        if (!$B.async_enabled) { obj[module_name] = {}; }
 
 
         // parse python into javascript
         try {
             var root = $B.py2js(src, module_name, [module_name], local_name);
             obj.code = root.to_js();
-            if ($B.async_enabled) obj.code = $B.execution_object.source_conversion(obj.code);
+            if ($B.async_enabled) { obj.code = $B.execution_object.source_conversion(obj.code); }
             //js=js.replace("@@", "\'", 'g')
         } catch (err) {
             if (err.$py_error === undefined) {
@@ -626,7 +656,6 @@
      */
     function injectTrace(code) {
         // console.log('brython:\n\n' + code);
-        var end = code.length;
         var newCode = "";
         var whileLine;
         var codearr = code.split('\n');
@@ -684,7 +713,7 @@
 
         function getNextLine(code) {
             var match = LINE_RGX.exec(code);
-            if (!match) return null;
+            if (!match) { return null; }
             return {
                 indent: match[1].length,
                 indentString: match[1],
@@ -698,7 +727,7 @@
 
         function getNextWhile(code) {
             var match = WHILE_RGX.exec(code);
-            if (!match) return null;
+            if (!match) { return null; }
             return {
                 indent: match[1].length,
                 indentString: match[1],
@@ -709,7 +738,7 @@
 
         function getNextFunction(code) {
             var match = FUNC_RGX.exec(code);
-            if (!match) return null;
+            if (!match) { return null; }
             return {
                 indent: match[1].length,
                 name: match[2],
@@ -733,7 +762,7 @@
 
         function getNextInput(code, re) {
             var match = re.exec(code);
-            if (!match) return null;
+            if (!match) { return null; }
             return {
                 param: match[1],
                 string: match[0],
@@ -754,6 +783,8 @@
             eval('var $locals_' + obj.module_name + '= obj["' + obj.module_name + '"]');
             var getattr = _b_.getattr;
             var setattr = _b_.setattr;
+            var delattr = _b_.setattr;
+
             var res = eval(js);
 
             if (res === undefined) return _b_.None;
@@ -768,7 +799,8 @@
 
     /**
      * Run Code without trace
-     * @param  {String} code code to run
+     * @param  {[type]} code [description]
+     * @return {[type]}      [description]
      */
     function runNoTrace(code) {
         resetDebugger();
@@ -785,11 +817,10 @@
             var None = _b_.None;
             var getattr = _b_.getattr;
             var setattr = _b_.setattr;
+            var delattr = _b_.delattr;
 
             if ($B.async_enabled) {
                 js = $B.execution_object.source_conversion(js);
-
-                //console.log(js)
                 eval(js);
             } else {
                 // Run resulting Javascript
@@ -813,7 +844,7 @@
      */
     function interpretCode(obj) {
         var initAPI = defineAPIScope(obj);
-        return new Interpreter(obj.code, initAPI);
+        return new window.Interpreter(obj.code, initAPI);
     }
 
 
@@ -826,7 +857,7 @@
         return function initAPI(interpreter, scope) {
             // variables
 
-            interpreter.setProperty(scope, '__BRYTHON__', __BRYTHON__, true);
+            interpreter.setProperty(scope, '__BRYTHON__', $B, true);
             interpreter.setProperty(scope, '$locals_' + obj.module_name, obj[obj.module_name], true);
             interpreter.setProperty(scope, '_b_', _b_, true);
             interpreter.setProperty(scope, 'getattr', _b_.getattr, true);
@@ -856,36 +887,43 @@
         };
     }
 
+    /**
+     * return an object containing a history of what happend during the debug seesion
+     * this includes wether an error occured, the last global, local frame, stdout, print states, all line states
+     * if a syntax error occured teh last state is the erro state.
+     * @return {Object} debug session history
+     */
     function getSessionHistory() {
-        var last_state = getLastRecordedState();
-        if (last_state) {
-            return {
-                states: getRecordedStates(),
-                prints: recordedOut,
-                stdout: last_state.stdout,
-                locals: last_state.frame[1],
-                globals: last_state.frame[3],
-                error: didErrorOccure
-            };
+        var last_state;
+        if(didErrorOccure && errorState.type==="syntax_error") {
+            last_state = errorState;       
         } else {
-            return {
-                states:[],
-                prints:[],
-                stdout:"SyntaxError In Code",
-                stderr:"SyntaxError In Code",
-                locals:{},
-                globals:{},
-                error: didErrorOccure,
-            };
+            last_state = getLastRecordedState();
         }
-        
+        return {
+            states: recordedStates,
+            prints: recordedOut,
+            stdout: last_state.stdout,
+            locals: last_state.frame[1],
+            globals: last_state.frame[3],
+            error: didErrorOccure,
+            errorState: errorState
+        };    
     }
 
     var realStdOut = $B.stdout;
     var realStdErr = $B.stderr;
     var realStdIn = $B.stdin;
 
-    function createOut(cname, std, next) {
+    /**
+     * Creates an Std out object for writing to surign debugging, if next is specified then that object is called after the debug hook
+     * this function is used when we want to spy on the out streams instead of supressing them
+     * no_suppress_out toggles this behavior before debug start
+     * @param  {String}   std   the type of out stream out/err
+     * @param  {Function} next  real output steam to pass the call to if stream is not suppressed. 
+     * @return {Object}         a brython io class
+     */
+    function createOut(std, next) {
         var $io = {
             __class__: $B.$type,
             __name__: 'io'
@@ -913,22 +951,25 @@
     }
 
     var outerr = {
-        recordOut: createOut('dOut', 'stdout'),
-        recordErr: createOut('dErr', 'stderr'),
-        spyOut: createOut('dOut', 'stdout', realStdOut),
-        spyErr: createOut('dErr', 'stderr', realStdErr)
+        recordOut: createOut('stdout'),
+        recordErr: createOut('stderr'),
     };
 
 
     /**
      * setStdout to debugger stdout capturing output stream
+     * if spy is true the data will be passed along to the original output stream present at the start of the debug session.
      */
-    function setOutErr(record) {
+    function setOutErr(spy) {
         realStdOut = $B.stdout;
         realStdErr = $B.stderr;
-        var type = record ? 'record' : 'spy';
-        $B.stdout = outerr[type + 'Out'];
-        $B.stderr = outerr[type + 'Err'];
+        if(spy) {
+            $B.stdout = createOut('stdout', realStdOut);
+            $B.stderr = createOut('stderr', realStdErr);
+        } else {
+            $B.stdout = outerr.recordOut;
+            $B.stderr = outerr.recordErr;
+        }
     }
     /**
      * resetting back stdout to original stream before debugger ran
