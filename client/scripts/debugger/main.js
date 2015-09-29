@@ -671,7 +671,9 @@
         do {
 
             newCode += code.substr(0, index);
-            newCode += line.indentString + traceCall + "({event:'line', frame:$B.last($B.frames_stack), line_no: " + line.line_no + ", next_line_no: " + (+line.line_no + 1) + "});\n";
+            if (+line.line_no!==lastLineNo) { // bug fix for brython 3.2.2 for in loop outputing identical line traces after each other
+                newCode += line.indentString + traceCall + "({event:'line', frame:$B.last($B.frames_stack), line_no: " + line.line_no + ", next_line_no: " + (+line.line_no + 1) + "});\n";
+            }
             newCode += line.string;
             index += line.string.length;
             code = code.substr(index);
@@ -682,6 +684,7 @@
             if (line === null) {
                 break;
             }
+
             whileLine = getNextWhile(code);
             if (whileLine && whileLine.index < line.index) { // then I'm about to enter a while loop
                 code = injectWhileEndTrace(code, whileLine, lastLineNo); // add a trace at the end of the while block
@@ -707,7 +710,7 @@
             }
         }
 
-        // console.log('debugger:\n\n' + code);
+        console.log('debugger:\n\n' + newCode);
 
         return newCode;
 
@@ -755,7 +758,8 @@
             newCode += code.substr(0, res.index);
             newCode += whileLine.indentString + traceCall + "({event:'line', type:'endwhile', frame:$B.last($B.frames_stack), line_no: " + lastLine + ", next_line_no: " + (lastLine + 1) + "});\n";
             newCode += indent;
-            newCode += traceCall + "({event:'line', type:'afterwhile', frame:$B.last($B.frames_stack), line_no: " + (lastLine + 1) + ", next_line_no: " + (lastLine + 1) + "});\n";
+            // somehow seems to have proven useless
+            // newCode += traceCall + "({event:'line', type:'afterwhile', frame:$B.last($B.frames_stack), line_no: " + (lastLine) + ", next_line_no: " + (lastLine) + "});\n";
             newCode += code.substr(res.index + indent.length);
             return newCode;
         }

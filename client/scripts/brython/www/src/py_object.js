@@ -85,6 +85,7 @@ $ObjectDict.__dir__ = function(self) {
                 // '0', '1' are in attributes of string 'ab'
                 continue
             }
+            if(attr=='__mro__'){continue}
             res[pos++]=attr
         }
     }
@@ -333,6 +334,31 @@ object.$dict = $ObjectDict
 // object.__class__ = $factory : this is done in py_types
 $ObjectDict.$factory = object
 object.__repr__ = object.__str__ = function(){return "<class 'object'>"}
+
+$B.make_class = function(class_obj){
+    // class_obj has at least an attribute "name", and possibly an attribute
+    // init
+
+    function A(){
+        var res = {__class__:A.$dict}
+        if(class_obj.init){
+            class_obj.init.apply(null, 
+                [res].concat(Array.prototype.slice.call(arguments)))
+        }
+        return res
+    }
+
+    A.__class__ = $B.$factory
+
+    A.$dict = {
+        $factory: A,
+        __class__: $B.type,
+        __name__: class_obj.name
+    }
+    A.$dict.__mro__ = [A.$dict, object.$dict]
+
+    return A
+}
 
 return object
 

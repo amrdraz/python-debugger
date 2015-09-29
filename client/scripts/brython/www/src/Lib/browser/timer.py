@@ -7,7 +7,9 @@ def wrap(func):
         try:
             return func(*args, **kw)
         except Exception as exc:
-            sys.stderr.write(exc)
+            msg = '{0.info}\n{0.__name__}: {0.args[0]}'.format(exc)
+            import sys
+            sys.stderr.write(msg)
     return f
 
 clear_interval = window.clearInterval
@@ -25,3 +27,8 @@ def request_animation_frame(func):
 
 def cancel_animation_frame(int_id):
     window.cancelAnimationFrame(int_id)
+
+def set_loop_timeout(x):
+    # set a variable used to stop loops that last more than x seconds
+    assert isinstance(x, int)
+    __BRYTHON__.loop_timeout = x

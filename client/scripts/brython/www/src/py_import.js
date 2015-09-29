@@ -81,8 +81,9 @@ function $importer(){
 }
 
 function $download_module(module,url){
-    var imp = $importer()
-    var $xmlhttp = imp[0],fake_qs=imp[1],timer=imp[2],res=null
+    var imp = $importer(),
+        $xmlhttp = imp[0],fake_qs=imp[1],timer=imp[2],res=null,
+        mod_name = module.__name__
 
     $xmlhttp.open('GET',url+fake_qs,false)
 
@@ -91,21 +92,25 @@ function $download_module(module,url){
          if ($xmlhttp.status == 200 || $xmlhttp.status == 0) {
             res = $xmlhttp.responseText
          } else {
-            res = _b_.FileNotFoundError("No module named '"+module+"'")
+            res = _b_.FileNotFoundError("No module named '"+mod_name+"'")
          }
       }
       $xmlhttp.onerror=function() {
-         res = _b_.FileNotFoundError("No module named '"+module+"'")
+         res = _b_.FileNotFoundError("No module named '"+mod_name+"'")
       }
     } else {
       $xmlhttp.onreadystatechange = function(){
         if($xmlhttp.readyState==4){
             window.clearTimeout(timer)
-            if($xmlhttp.status==200 || $xmlhttp.status==0){res=$xmlhttp.responseText}
-            else{
+            if($xmlhttp.status==200 || $xmlhttp.status==0){
+                res=$xmlhttp.responseText
+                module.$last_modified = $xmlhttp.getResponseHeader('Last-Modified')
+            }else{
                 // don't throw an exception here, it will not be caught (issue #30)
-            console.log('Error '+$xmlhttp.status+' means that Python module '+module+' was not found at url '+url)
-                res = _b_.FileNotFoundError("No module named '"+module+"'")
+                console.log('Error '+$xmlhttp.status+
+                    ' means that Python module '+mod_name+
+                    ' was not found at url '+url)
+                res = _b_.FileNotFoundError("No module named '"+mod_name+"'")
             }
         }
       }
@@ -114,9 +119,8 @@ function $download_module(module,url){
     $xmlhttp.send()
 
     //sometimes chrome doesn't set res correctly, so if res == null, assume no module found
-    if(res == null) throw _b_.FileNotFoundError("No module named '"+module+"' (res is null)")
+    if(res == null) throw _b_.FileNotFoundError("No module named '"+mod_name+"' (res is null)")
 
-    //console.log('res', res)
     if(res.constructor===Error){throw res} // module not found
     return res
 }
@@ -124,7 +128,7 @@ function $download_module(module,url){
 $B.$download_module=$download_module
 
 function import_js(module,path) {
-    try{var module_contents=$download_module(module.name, path)}
+    try{var module_contents=$download_module(module, path)}
     catch(err){return null}
     run_js(module_contents,path,module)
     return true
@@ -181,13 +185,10 @@ function show_ns(){
 
 function import_py(module,path,package){
     // import Python module at specified path
-    var mod_name = module.__name__;
-    try{
-        var module_contents=$download_module(mod_name, path)
-    }catch(err){
-        return null
-    }
+    var mod_name = module.__name__,
+        module_contents = $download_module(module, path)
     $B.imported[mod_name].$is_package = module.$is_package
+    $B.imported[mod_name].$last_modified = module.$last_modified
     if(path.substr(path.length-12)=='/__init__.py'){
         //module.is_package = true
         $B.imported[mod_name].__package__ = mod_name
@@ -550,7 +551,7 @@ vfs_hook.$dict = {
     __name__: 'VfsPathFinder',
 
     load_vfs: function(self) {
-        try { var code = $download_module('<VFS>', self.path) }
+        try { var code = $download_module({__name__:'<VFS>'}, self.path) }
         catch (e) {
             self.vfs = undefined;
             throw new _b_.ImportError(e.$message || e.message);
@@ -641,7 +642,7 @@ url_hook.$dict = {
         for (var j = 0; notfound && j < modpaths.length; ++j) {
             try{
                 var file_info = modpaths[j];
-                loader_data.code=$download_module(fullname, file_info[0]);
+                loader_data.code=$download_module({__name__:fullname}, file_info[0]);
                 notfound = false;
                 loader_data.type = file_info[1];
                 loader_data.is_package = file_info[2];
@@ -702,13 +703,13 @@ delete _path;
 delete _type;
 delete _sys_paths;
 
-window.is_none = function (o) {
+$B.is_none = function (o) {
     return o === undefined || o == _b_.None;
 }
 
 // Default __import__ function
 // TODO: Include at runtime in importlib.__import__
-$B.$__import__ = function (mod_name, globals, locals, fromlist, level){
+$B.$__import__ = function (mod_name, locals, fromlist){
    // [Import spec] Halt import logic
    var modobj = $B.imported[mod_name],
        parsed_name = mod_name.split('.');
@@ -720,16 +721,8 @@ $B.$__import__ = function (mod_name, globals, locals, fromlist, level){
    if (modobj === undefined) {
        // [Import spec] Argument defaults and preconditions
        // get name of module this was called in
-       if (is_none(globals)) {
-            var current_frame = $B.frames_stack[$B.frames_stack.length-1];
-            globals = current_frame[3];
-       }
-       var origin = globals.__name__
        if (is_none(fromlist)) {
             fromlist = [];
-       }
-       if (is_none(level)) {
-            level = 0;
        }
        // TODO: Async module download and request multiplexing
        for (var i = 0, modsep = '', _mod_name = '', l = parsed_name.length - 1,
@@ -743,7 +736,7 @@ $B.$__import__ = function (mod_name, globals, locals, fromlist, level){
                 throw _b_.ImportError(_mod_name) 
             }
             else if (modobj === undefined) {
-                try {window.import_hooks(_mod_name, origin, __path__)}
+                try {$B.import_hooks(_mod_name, __path__)}
                 catch(err) {
                     delete $B.imported[_mod_name]
                 }
@@ -789,26 +782,17 @@ $B.$__import__ = function (mod_name, globals, locals, fromlist, level){
  * found or loaded
  *
  * @param {string}      Module name specified in the import statement
- * @param {string}      Name of the module invoking the import statement
  * @param {list}        Attribute names specified in from statement
  * @param {dict}        Aliases used to override local variable name bindings
  * @param {dict}        Local namespace import bindings will be applied upon
  * @return None
  */
-$B.$import = function(mod_name,origin,fromlist, aliases, locals){
+$B.$import = function(mod_name, fromlist, aliases, locals){
     var parts = mod_name.split('.');
     // For . , .. and so on , remove one relative step
     if (mod_name[mod_name.length - 1] == '.') { parts.pop() }
-    if (mod_name[0] == '.') {
-        // Relative imports
-        norm_parts = _b_.getattr($B.imported[origin], '__package__', '');
-        // Add a dummy item at the end so that initial dot corresponds to current pkg
-        norm_parts = (norm_parts == '')? ['']: (norm_parts + '.').split('.');
-    }
-    else {
-        var norm_parts = []
-    }
-    prefix = true;
+    var norm_parts = [],
+        prefix = true;
     for(var i = 0, _len_i = parts.length; i < _len_i;i++){
         var p = parts[i];
         if (prefix && p == '') {
@@ -833,16 +817,16 @@ $B.$import = function(mod_name,origin,fromlist, aliases, locals){
     //if ($B.$options.debug == 10) {show_ns()}
 
     // [Import spec] Resolve __import__ in global namespace
-    var current_frame = $B.frames_stack[$B.frames_stack.length-1];
-    globals = current_frame[3];
-    __import__ = globals['__import__'];
+    var current_frame = $B.frames_stack[$B.frames_stack.length-1],
+        globals = current_frame[3],
+        __import__ = globals['__import__'];
     if (__import__ === undefined) {
         // [Import spec] Fall back to
         __import__ = $B.$__import__;
     }
     // FIXME: Should we need locals dict supply it in, now it is useless
     var modobj = _b_.getattr(__import__,
-                             '__call__')(mod_name, globals, undefined, fromlist, 0);
+                             '__call__')(mod_name, undefined, fromlist);
 
     // Apply bindings upon local namespace
     if (!fromlist || fromlist.length == 0) {
@@ -892,7 +876,7 @@ $B.$import = function(mod_name,origin,fromlist, aliases, locals){
                     try {
                         _b_.getattr(__import__,
                                     '__call__')(mod_name + '.' + name,
-                                                globals, undefined, [], 0);
+                                                 undefined, []);
                     }
                     catch ($err2) {
                         if ($err2.__class__ = _b_.ImportError.$dict) {
@@ -905,6 +889,7 @@ $B.$import = function(mod_name,origin,fromlist, aliases, locals){
                         locals[alias] = _b_.getattr(modobj, name);
                     }
                     catch ($err3) {
+                        console.log('error', $err3)
                         // [Import spec] On attribute not found , raise ImportError
                         if ($err3.__class__ === _b_.AttributeError.$dict) {
                             $err3.__class__ = _b_.ImportError.$dict;

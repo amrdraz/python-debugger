@@ -17,6 +17,40 @@
         prompt: function(message, default_value){
             return $B.JSObject(window.prompt(message, default_value||''))
         },
+        reload: function(){
+            // Javascripts in the page
+            var scripts = document.getElementsByTagName('script'),
+                js_scripts = []
+            for(var i=0;i<scripts.length;i++){
+                if(scripts[i].type===undefined || 
+                    scripts[i].type=='text/javascript'){
+                    js_scripts.push(scripts[i])
+                    if(scripts[i].src){
+                        var new_script = document.createElement('SCRIPT')
+                        console.log(scripts[i].src)
+                        //new_script.src = scripts[i].src
+                        //scripts[i].parentElement.appendChild(new_script)
+                        //scripts[i].parentElement.removeChild(scripts[i])
+                    }
+                }
+            }
+            console.log(js_scripts)
+            // Python scripts in current page
+            for(var i=0;i<$B.scripts.length;i++){
+                var name = $B.scripts[i]
+                console.log('script:', name)
+                //console.log($B.$py_src[name])
+                //console.log($B.js[name])
+            }
+            // Check if imported scripts have been modified
+            for(var mod in $B.imported){
+                if($B.imported[mod].$last_modified){
+                    console.log('check', mod, $B.imported[mod].__file__, $B.imported[mod].$last_modified)
+                }else{
+                    console.log('no date for mod', mod)
+                }
+            }
+        },
         win: $B.win,
         window: $B.win,
         URLParameter:function(name) {
@@ -42,7 +76,7 @@
                 }
         
             dict.__init__ = function(){
-                var $ns=$B.$MakeArgs1('pow',1,{self:null},['self'],arguments,
+                var $ns=$B.args('pow',1,{self:null},['self'],arguments,
                     {},'args','kw')
                 var self = $ns['self']
                 var args = $ns['args']
