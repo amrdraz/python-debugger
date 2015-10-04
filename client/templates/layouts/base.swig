@@ -72,6 +72,8 @@
     </div>
     {% endblock %}
     <!-- build:js(client) scripts/global.js -->
+      <script src="/bower_components/jquery/dist/jquery.js"></script>
+      <script src="/bower_components/bootstrap-sass/assets/javascripts/bootstrap.min.js"></script>
       <script src="/bower_components/lodash/lodash.js"></script>
       {% block extra_script %}
       {% endblock %}

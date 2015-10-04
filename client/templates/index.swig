@@ -3,7 +3,19 @@
 
 {% block content %}
 <section class="row">
-<div class="col-lg-6">
+<div class="col-md-6">
+  <div class="row">
+      <ul class="nav nav-tabs">
+        <li class="active"><a href="#code" data-toggle="tab">Code</a></li>
+      </ul>
+      <div class="tab-content">
+          <div class="tab-pane fade in active font-control" id="code">
+            <textarea id="editor"></textarea>
+          </div>
+      </div>
+  </div>
+</div>
+<div class="col-md-6">
   <div class="row">
     <button id="run" class="btn pull-left"> ▶ Run</button>
     <button id="debug" class="btn pull-left"> ⏏ Start Debuger</button>
@@ -12,24 +24,16 @@
     <button id="stop" class="btn pull-left" disabled> ■ Stop</button>
   </div>
   <div class="row">
-      <ul class="nav nav-tabs">
-        <li class="active"><a href="#code" data-toggle="tab">Code</a></li>
-      </ul>
-      <div class="tab-content">
-          <div class="tab-pane fade in active" id="code">
-            <textarea id="editor"></textarea>
-          </div>
-      </div>
-  </div>
-</div>
-<div class="col-lg-6">
-  <div class="row">
     <ul class="nav nav-tabs">
-        <li class="active"><a href="con" data-toggle="tab">Console</a></li>
+        <li class="active"><a href="#con" data-toggle="tab">Console</a></li>
+        <li><a href="#container" data-toggle="tab">Canvas</a></li>
     </ul>
     <div class="tab-content">
-      <div class="tab-pane fade in active" id="con">
+      <div class="tab-pane fade in active font-control" id="con">
         <textarea id="console" autocomplete="off"></textarea>
+      </div>
+      <div class="tab-pane fade in" id="container">
+        
       </div>
     </div>
   </div>

@@ -73,7 +73,7 @@ var taskConfig = function(grunt) {
         '<%= yeogurt.client %>/*.{ico,png,txt}',
         '<%= yeogurt.tmp %>/**/*.html',
         '<%= yeogurt.tmp %>/styles/**/*.{css,ttf,otf,woff,svg,eot}',
-        '<%= yeogurt.tmp %>/scripts/**/*.js',
+        '<%= yeogurt.tmp %>/scripts/**/*.{js,py}',
         '<%= yeogurt.client %>/images/**/*.{png,jpg,jpeg,gif,webp,svg}'
       ]
     }
