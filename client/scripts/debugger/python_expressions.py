@@ -1,40 +1,69 @@
 # python expressions
 
 1
+print(1)
 a = 2
+print(a)
 a += 3
+print(a)
 b = a - 4
+print(b)
 c = b / a
+print(c)
 d = b ** 2
+print(d)
 c = d // b * (a + c)
+print(c)
 r = d % b
+print(r)
 b = 3 | 2
+print(b)
 b = 2 & -1
-a, b = 5, 6
+print(b)
 
-
+print("Booelan Expressions")
+print(False)
 t = True
+print(t)
 f = False
+print(f)
 b = t and f
+print(b)
 b = t or f
+print(b)
 b = not f
+print(b)
 n = 0 or 2
+print(b)
 m = 1 and 50
+print(m)
 b = (1+3 and f) or t
-
+print(b)
 
 b = t == b
+print(b)
 b = t is b
+print(b)
 b = t != b
+print(b)
 b = n < m
+print(b)
 b = n > m
+print(b)
 b = n <= m
+print(b)
 b = n >= m
+print(b)
 
+print("iteratables")
 l = [a, b, c, d]
+print(l)
 s = {a, b, c, d}
+print(s)
 d = {"a": a, "c": c}
+print(d)
 t = (a, c)
+print(t)
 
 if t:
     print("true")
