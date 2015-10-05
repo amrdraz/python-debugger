@@ -3,8 +3,13 @@
 
 {% block content %}
 <section class="row">
-<div class="col-md-6">
+<div class="col-md-6 col-sm-8 col-xs-7">
   <div class="row">
+      <button id="stop" class="btn pull-right" disabled> ■ Stop</button>
+      <button id="step" class="btn pull-right" disabled> &#8677; Step</button>
+      <button id="back" class="btn pull-right" disabled> &#8676; Back</button>
+      <button id="debug" class="btn pull-right"> ⏏ Start Debuger</button>
+      <button id="run" class="btn pull-right"> ▶ Run</button>
       <ul class="nav nav-tabs">
         <li class="active"><a href="#code" data-toggle="tab">Code</a></li>
       </ul>
@@ -15,14 +20,7 @@
       </div>
   </div>
 </div>
-<div class="col-md-6">
-  <div class="row">
-    <button id="run" class="btn pull-left"> ▶ Run</button>
-    <button id="debug" class="btn pull-left"> ⏏ Start Debuger</button>
-    <button id="back" class="btn pull-left" disabled> &#8676; Back</button>
-    <button id="step" class="btn pull-left" disabled> &#8677; Step</button>
-    <button id="stop" class="btn pull-left" disabled> ■ Stop</button>
-  </div>
+<div class="col-md-6 col-sm-4 col-xs-5">
   <div class="row">
     <ul class="nav nav-tabs">
         <li class="active"><a href="#con" data-toggle="tab">Console</a></li>

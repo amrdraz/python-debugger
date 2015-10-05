@@ -76,7 +76,7 @@
     var LINE_RGX = /^( *);\$locals\.\$line_info=\"(\d+),(.+)\";/m;
     var WHILE_RGX = /^( *)while/m;
     var FUNC_RGX = /^( *)\$locals.*\[\"(.+)\"\]=\(function\(\){/m;
-    var INPUT_RGX = /getattr\(\$B.builtins\[\"input\"\],\"__call__\"\)\(((?:\"(.)*\")|\d*)\)/g; // only works for string params
+    var INPUT_RGX = /getattr\(input,\"__call__\"\)\(((?:\"(.)*\")|\d*)\)/g; // only works for string params
     var HALT = "HALT";
 
     function callbackSetter(key) {
@@ -371,17 +371,17 @@
         if (!isRecorded) {
             linePause = true;
         }
+        lastState = getLastRecordedState();
         state.printerr = state.stderr = state.stdout = state.printout = "";
-        if (getLastRecordedState()) {
-            state.stdout = getLastRecordedState().stdout;
-            state.stderr = getLastRecordedState().stderr;
+        if (lastState) {
+            state.stdout = lastState.stdout;
+            state.stderr = lastState.stderr;
             state.locals = state.frame[1];
             state.globals = state.frame[3];
             state.var_names = Object.keys(state.locals).filter(function(key) {
                 return !/^(__|_|\$)/.test(key);
             });
-
-            getLastRecordedState().next_line_no = state.line_no;
+            lastState.next_line_no = state.line_no;
         }
         if (isDisposableState(state)) {
             return;
@@ -665,7 +665,7 @@
         if (line === null) { // in case empty code
             return code;
         }
-        var lastLineNo = 1;
+        var lastLineNo = 0;
         var largestLine = 1;
         var index = line.index;
         do {
@@ -701,7 +701,7 @@
             var inputLine = getNextInput(newCode, re);
             while (inputLine !== null) {
                 code = newCode.substr(0, inputLine.index);
-                var inJect = traceCall + "({event:'input', arg:" + inputLine.param + ", id:'" + inputLine.index + "'})";
+                var inJect = traceCall + "({event:'input'" + (inputLine.param?", arg:"+inputLine.param:"") + ", id:'" + inputLine.index + "'})";
                 code += inJect;
                 index = inputLine.index + inputLine.string.length;
                 code += newCode.substr(index);
