@@ -103,7 +103,7 @@
         if (storage) {
             storage["py_src"] = src;
         }
-        Debugger.run_no_debugger(src);
+        Debugger.run_to_end(src);
     }
 
     function start_debugger(ev) {
@@ -181,9 +181,6 @@
             doc('console').value = err.data;
             Debugger.stop_debugger();
         }
-
-        err.column_no_start = 0;
-        err.column_no_stop = 200;
         err.severity = 'error';
         editor.updateLinting(CodeMirror.lintResult([err]));
     }
