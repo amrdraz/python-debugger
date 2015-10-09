@@ -782,6 +782,7 @@
      */
     function runTrace(obj) {
         var js = obj.code;
+        // firstRunCheck();
         // Initialise locals object
         try {
             eval('var $locals_' + obj.module_name + '= obj["' + obj.module_name + '"]');
@@ -807,21 +808,17 @@
      */
     function runNoTrace(code) {
         resetDebugger();
+        // firstRunCheck();
         var module_name = '__main__';
         $B.$py_module_path[module_name] = window.location.href;
         try {
             var root = $B.py2js(code, module_name, module_name, '__builtins__');
 
             var js = root.to_js();
-            if ($B.debug > 1) {
-                console.log(js);
-            }
-
             var None = _b_.None;
             var getattr = _b_.getattr;
             var setattr = _b_.setattr;
-            var delattr = _b_.delattr;
-
+            var delattr = _b_.setattr;
             if ($B.async_enabled) {
                 js = $B.execution_object.source_conversion(js);
                 eval(js);
@@ -980,5 +977,15 @@
     function resetOutErr() {
         $B.stdout = realStdOut;
         $B.stderr = realStdErr;
+    }
+
+    function firstRunCheck () {
+        if($B.frames_stack<1) {
+            var module_name = '__main__';
+            $B.$py_module_path[module_name] = window.location.href;
+            var root = $B.py2js("", module_name, module_name, '__builtins__');
+            var js = root.to_js();
+            eval(js);
+        }
     }
 })(window);

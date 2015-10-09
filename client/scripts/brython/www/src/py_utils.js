@@ -152,6 +152,8 @@ $B.$list_comp = function(env){
     // Called for list comprehensions
     // "env" is a list of [local_name, local_ns] lists for all the enclosing
     // namespaces
+
+        
     var $ix = $B.UUID()
     var $py = "x"+$ix+"=[]\n", indent = 0
     for(var $i=2, _len_$i = arguments.length; $i < _len_$i;$i++){
@@ -168,13 +170,14 @@ $B.$list_comp = function(env){
         var sc_id = '$locals_'+env[i][0].replace(/\./,'_')
         eval('var '+sc_id+'=env[i][1]')
     }
-    var local_name = env[0][0]
-    var module_env = env[env.length-1]
-    var module_name = module_env[0]
+    
+    var locals_id = env[0][0],
+        module_obj = env[env.length-1],
+        globals_id = module_obj[0]
 
     var listcomp_name = 'lc'+$ix
 
-    var $root = $B.py2js($py,module_name,listcomp_name,local_name,
+    var $root = $B.py2js($py, globals_id, listcomp_name, locals_id,
         $B.line_info)
     
     $root.caller = $B.line_info
@@ -184,11 +187,14 @@ $B.$list_comp = function(env){
         eval($js)
         var res = eval('$locals_'+listcomp_name+'["x"+$ix]')
     }
-    catch(err){throw $B.exception(err)}
+    catch(err){
+        console.log('list comp error\n',err)
+        throw $B.exception(err)
+    }
     finally{
         clear(listcomp_name)
     }
-
+    
     return res
 }
 
@@ -517,7 +523,7 @@ $B.set_list_slice_step = function(obj,start,stop,step,value){
 
 
 $B.$setitem = function(obj,item,value){
-    if(Array.isArray(obj) && typeof item=='number'){
+    if(Array.isArray(obj) && typeof item=='number' && !_b_.isinstance(obj,_b_.tuple)){
         if(item<0){item+=obj.length}
         if(obj[item]===undefined){throw _b_.IndexError("list assignment index out of range")}
         obj[item]=value
@@ -568,6 +574,7 @@ $B.$syntax_err_line = function(exc,module,pos) {
     var pos2line = {}
     var lnum=1
     var src = $B.$py_src[module]
+    if(src===undefined){console.log('no src for', module)}
     var line_pos = {1:0}
     for(var i=0, _len_i = src.length; i < _len_i;i++){
         pos2line[i]=lnum
@@ -717,9 +724,16 @@ $B.stdout = {
 }
 
 $B.stdin = {
-    __class__:$io,
-    //fix me
-    read: function(size){return ''}
+    __class__: $io,
+    __original__:true,
+    closed: false,
+    len:1, pos:0,
+    read: function () {
+        return '';
+    },
+    readline: function() {
+        return '';
+    }
 }
 
 $B.jsobject2pyobject=function(obj){
@@ -1001,7 +1015,22 @@ $B.$GetInt=function(value) {
       "' object cannot be interpreted as an integer")
 }
 
+$B.int_or_bool = function(v){
+    switch(typeof v){
+        case "bool":
+            return v ? 1 : 0
+        case "number":
+            return v
+        case "object":
+            if(v.__class__===$B.LongInt.$dict){return v}
+        default:
+            throw _b_.TypeError("'"+$B.get_class(v).__name__+
+                "' object cannot be interpreted as an integer")
+    }
+}
+
 $B.enter_frame = function(frame){
+    if($B.frames_stack===undefined){alert('frames stack udef')}
     $B.frames_stack[$B.frames_stack.length]=frame
 }
 
