@@ -19,8 +19,8 @@
         lineNumbers: true,
         indentUnits: 4,
         lineWrapping: true,
-        gutters: ["CodeMirror-lint-markers", "CodeMirror-linenumbers"],
-        lint:{},
+        gutters: ["cm-trace-marker", "CodeMirror-lint-markers", "CodeMirror-linenumbers"],
+        lint: {},
         styleActiveLine: true,
         mode: {
             name: "python",
@@ -28,6 +28,36 @@
             singleLineStringErrors: false
         }
     });
+
+    editor.on('change', function(cm) {
+        var text = cm.getValue();
+        if (text.charAt(text.length - 1) !== "\n") {
+            var cursor = editor.getDoc().getCursor();
+            cm.setValue(text + "\n");
+            editor.getDoc().setCursor(cursor, {
+                scroll: true
+            });
+        }
+    })
+
+    editor.setOption("extraKeys", {
+        Tab: function(cm) {
+            var spaces = Array(cm.getOption("indentUnit") + 1).join(" ");
+            cm.replaceSelection(spaces);
+        }
+    });
+
+    function setDebugLinePointer(n) {
+        editor.clearGutter("cm-trace-marker");
+        editor.setGutterMarker(n, "cm-trace-marker", makeMarker());
+    };
+
+    function makeMarker() {
+        var marker = document.createElement("div");
+        marker.className = "cm-debug-arrow";
+        marker.innerHTML = "➤";
+        return marker;
+    }
 
 
     var output;
@@ -47,9 +77,10 @@
         editor.getDoc().setCursor(line - 1, {
             scroll: true
         });
+        setDebugLinePointer(line);
     }
 
-    function clearLint () {
+    function clearLint() {
         editor.updateLinting([]);
     }
 
@@ -85,7 +116,7 @@
         // $B.stdout.write(arg);
         if (stdin.__original__) {
             val = prompt(arg)
-            return val?val:"";
+            return val ? val : "";
         }
         val = _b_.getattr(stdin, 'readline')();
         val = val.split('\n')[0];
@@ -118,6 +149,7 @@
     }
 
     function stop_debugger(ev) {
+        editor.clearGutter("cm-trace-marker");
         Debugger.stop_debugger();
     }
 
