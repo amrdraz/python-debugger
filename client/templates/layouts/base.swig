@@ -13,7 +13,7 @@
     <meta charset="utf-8"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
     <title>Python Debugger</title>
-    <meta name="description" content=""/>
+    <meta name="description" content="An offline ready JavaScript based Python runner and debugger"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <!-- build:css(client) styles/global.css -->
       <!-- bower:css -->
@@ -22,7 +22,8 @@
       {% block extra_style %}
       {% endblock %}
     <!-- endbuild -->
-
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="styles/main.css">
     <!-- build:js(client) scripts/modernizr.js -->
     <script src="/bower_components/modernizr/modernizr.js"></script>
