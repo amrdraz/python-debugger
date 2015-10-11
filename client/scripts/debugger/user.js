@@ -48,9 +48,13 @@
     });
 
     function setDebugLinePointer(n) {
-        editor.clearGutter("cm-trace-marker");
-        editor.setGutterMarker(n, "cm-trace-marker", makeMarker());
+        clearPointer();
+        editor.setGutterMarker(n-1, "cm-trace-marker", makeMarker());
     };
+
+    function clearPointer () {
+        editor.clearGutter("cm-trace-marker");
+    }
 
     function makeMarker() {
         var marker = document.createElement("div");
@@ -116,7 +120,7 @@
         // $B.stdout.write(arg);
         if (stdin.__original__) {
             val = prompt(arg)
-            return val ? val : "";
+            return (val ? val : "");
         }
         val = _b_.getattr(stdin, 'readline')();
         val = val.split('\n')[0];
@@ -124,7 +128,7 @@
             _b_.getattr(stdin, 'close')();
         }
         // $B.stdout.write(val+'\n');
-        return val;
+        return (val);
     };
 
     function run() {
@@ -135,6 +139,7 @@
             storage["py_src"] = src;
         }
         Debugger.run_to_end(src);
+        Debugger.step_to_last_step();
     }
 
     function start_debugger(ev) {
@@ -149,7 +154,6 @@
     }
 
     function stop_debugger(ev) {
-        editor.clearGutter("cm-trace-marker");
         Debugger.stop_debugger();
     }
 
@@ -187,6 +191,7 @@
         doc('step').disabled = true;
         doc('back').disabled = true;
         doc('stop').disabled = true;
+        clearPointer();
     }
 
     function debug_step(state) {
@@ -214,6 +219,7 @@
             Debugger.stop_debugger();
         }
         err.severity = 'error';
+        
         editor.updateLinting(CodeMirror.lintResult([err]));
     }
 
