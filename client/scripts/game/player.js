@@ -214,7 +214,7 @@
 
     function debug_step(state) {
 
-        if(state.game_state) {
+        if(state.game_next_state) {
             Game.set_state(state.game_next_state);
             Game.game.draw();
         }
