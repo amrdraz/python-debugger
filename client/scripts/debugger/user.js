@@ -138,8 +138,16 @@
         if (storage) {
             storage["py_src"] = src;
         }
-        Debugger.run_to_end(src);
-        Debugger.step_to_last_step();
+        Debugger.unset_events();
+        var hist = Debugger.run_to_end(src);
+        Debugger.reset_events();
+        if(hist.error) {
+            var state = hist.errorState;
+            doc('console').value = state.data;
+            state.message = state.name+": "+state.message;
+            state.severity = 'error';
+            editor.updateLinting(CodeMirror.lintResult([state]));
+        }
     }
 
     function start_debugger(ev) {
@@ -210,17 +218,26 @@
         } else {
             doc('back').disabled = false;
         }
+
+        if(state.err) {
+            doc('console').value = state.data;
+            state.message = state.name+": "+state.message;
+            state.severity = 'error';
+            editor.updateLinting(CodeMirror.lintResult([state]));
+        } else {
+            clearLint()
+        }
     }
 
 
     function debug_error(err, Debugger) {
-        if (Debugger.get_recorded_states().length === 0) {
-            doc('console').value = err.data;
-            Debugger.stop_debugger();
-        }
-        err.severity = 'error';
+        // if (Debugger.get_recorded_states().length === 0) {
+        //     doc('console').value = err.data;
+        //     Debugger.stop_debugger();
+        // }
+        // err.severity = 'error';
         
-        editor.updateLinting(CodeMirror.lintResult([err]));
+        // editor.updateLinting(CodeMirror.lintResult([err]));
     }
 
     function show_js(ev) {

@@ -67,7 +67,7 @@
         </div>
     </div>
   
-    <div class="container marketing">
+    <div class="container-fluid marketing">
     {% block content %}{% endblock %}
     </div>
     </div>
@@ -82,9 +82,9 @@
     
     <script src="scripts/brython/www/src/brython.js"></script>
    <!-- build:js(client) scripts/main.js -->
-    <script src="scripts/debugger/main.js" type="text/javascript" charset="utf-8"></script>
-    <script src="scripts/debugger/user.js" type="text/javascript" charset="utf-8"></script>
-    <script src="scripts/debugger/extra_module.js" type="text/javascript" charset="utf-8"></script>
+    <script src="scripts/debugger/debugger.js" type="text/javascript" charset="utf-8"></script>
+    {% block extra_page_script %}
+    {% endblock %}
     <!-- endbuild -->
     
   </body>
