@@ -58,8 +58,8 @@
           <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
               <li>
-                  <a href="game.html" class="btn" >
-                    Od Game
+                  <a href="sandbox.html" class="btn" >
+                    Od Sandbox
                   </a>
               </li>
               <li>
