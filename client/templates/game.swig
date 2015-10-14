@@ -69,9 +69,6 @@
 {% endblock %}
 
 {% block extra_page_script %}
-    <!-- build:js(client) scripts/odgame.js -->
-    <script src="scripts/debugger/debugger.js" type="text/javascript" charset="utf-8"></script>
     <script src="scripts/game/game.js"></script>
     <script src="scripts/game/player.js"></script>
-    <!-- endbuild -->
 {% endblock %}

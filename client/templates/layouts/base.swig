@@ -86,10 +86,12 @@
     <!-- endbuild -->
     
     <script src="scripts/brython/www/src/brython.js"></script>
-    {% block extra_page_script %}
-   <!-- build:js(client) scripts/main.js -->
+
+    <!-- build:js(client) scripts/main.js -->
     <script src="scripts/debugger/debugger.js" type="text/javascript" charset="utf-8"></script>
     <!-- endbuild -->
+
+    {% block extra_page_script %}
     {% endblock %}
     
     <script>
