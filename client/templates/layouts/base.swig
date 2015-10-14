@@ -86,11 +86,11 @@
     <!-- endbuild -->
     
     <script src="scripts/brython/www/src/brython.js"></script>
+    {% block extra_page_script %}
    <!-- build:js(client) scripts/main.js -->
     <script src="scripts/debugger/debugger.js" type="text/javascript" charset="utf-8"></script>
-    {% block extra_page_script %}
-    {% endblock %}
     <!-- endbuild -->
+    {% endblock %}
     
     <script>
       (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){

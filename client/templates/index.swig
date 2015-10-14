@@ -5,20 +5,22 @@
 <section class="row">
 <div class="col-md-6 col-sm-8 col-xs-7">
   <div class="row">
-      <div class="btn-group pull-right">
-        <button id="debug" class="btn"> ⏏ Start Debuger</button>
-        <button id="back" class="btn" disabled> &#8676; Back</button>
-        <button id="step" class="btn" disabled> &#8677; Step</button>
-        <button id="stop" class="btn" disabled> ■ Stop</button>
-        <button id="run" class="btn"> ▶ Run</button>
-      </div>
-      <ul class="nav nav-tabs">
-        <li class="active"><a href="#code" data-toggle="tab">Code</a></li>
-      </ul>
-      <div class="tab-content">
-          <div class="tab-pane fade in active font-control" id="code">
-            <textarea id="editor"></textarea>
-          </div>
+      <div class="col-md-12">
+        <div class="btn-group pull-right">
+          <button id="debug" class="btn"> ⏏ Start Debuger</button>
+          <button id="back" class="btn" disabled> &#8676; Back</button>
+          <button id="step" class="btn" disabled> &#8677; Step</button>
+          <button id="stop" class="btn" disabled> ■ Stop</button>
+          <button id="run" class="btn"> ▶ Run</button>
+        </div>
+        <ul class="nav nav-tabs">
+          <li class="active"><a href="#code" data-toggle="tab">Code</a></li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane fade in active font-control" id="code">
+              <textarea id="editor"></textarea>
+            </div>
+        </div>
       </div>
   </div>
 </div>
@@ -55,6 +57,9 @@
 {% endblock %}
 
 {% block extra_page_script %}
+    <!-- build:js(client) scripts/main.js -->
+    <script src="scripts/debugger/debugger.js" type="text/javascript" charset="utf-8"></script>
     <script src="scripts/debugger/user.js" type="text/javascript" charset="utf-8"></script>
+    <!-- endbuild -->
 {% endblock %}
 
