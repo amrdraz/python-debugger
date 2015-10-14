@@ -141,10 +141,17 @@
             storage["py_game_src"] = src;
         }
         Debugger.unset_events();
-        Debugger.run_to_end(src);
+        var hist = Debugger.run_to_end(src);
         Debugger.reset_events();
         Game.can_draw(true);
         Game.game.draw();
+        if(hist.error) {
+            var state = hist.errorState;
+            doc('console').value = state.data;
+            state.message = state.name+": "+state.message;
+            state.severity = 'error';
+            editor.updateLinting(CodeMirror.lintResult([state]));
+        }
     }
 
     function start_debugger(ev) {
@@ -226,17 +233,20 @@
         } else {
             doc('back').disabled = false;
         }
+
+        if(state.err) {
+            doc('console').value = state.data;
+            state.message = state.name+": "+state.message;
+            state.severity = 'error';
+            editor.updateLinting(CodeMirror.lintResult([state]));
+        } else {
+            clearLint()
+        }
     }
 
 
     function debug_error(err, Debugger) {
-        if (Debugger.get_recorded_states().length === 0) {
-            doc('console').value = err.data;
-            Debugger.stop_debugger();
-        }
-        err.severity = 'error';
         
-        editor.updateLinting(CodeMirror.lintResult([err]));
     }
 
     function  reset_game_state() {
