@@ -124,3 +124,25 @@ body {
 .font-control pre, .font-control textarea {
     font-size: 20px!important;
 }
+
+#console.game-console {
+    height: auto;
+    min-height: 120px;
+    max-height: 120px;
+}
+
+.game-stage {
+    text-align: center;
+}
+.game-stage canvas {
+    margin: 0 auto;
+    display: block;
+}
+.game-control {
+    margin: 0 auto;
+}
+
+#turtlecanvas {
+   background:#fff;
+   border: 1px solid red;
+}

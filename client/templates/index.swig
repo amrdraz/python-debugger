@@ -40,7 +40,6 @@
 
 
 {% block extra_style %}
-    <link rel="stylesheet" href="bower_components/brython/www/doc/doc_brython.css">
     <link rel="stylesheet" href="styles/console.css">
     <link rel="stylesheet" href="bower_components/codemirror/lib/codemirror.css">
     <link rel="stylesheet" href="bower_components/codemirror/addon/lint/lint.css">
