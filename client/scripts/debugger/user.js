@@ -148,6 +148,12 @@
             state.severity = 'error';
             editor.updateLinting(CodeMirror.lintResult([state]));
         }
+        PD.sendActivity({
+            action: 'run',
+            meta: {
+                error: hist.error
+            }
+        });
     }
 
     function start_debugger(ev) {
@@ -158,7 +164,13 @@
             storage["py_src"] = src;
         }
 
-        Debugger.start_debugger(src, true);
+        var hist = Debugger.start_debugger(src, true);
+        PD.sendActivity({
+            action: 'debug',
+            meta: {
+                error: hist.error
+            }
+        });
     }
 
     function stop_debugger(ev) {

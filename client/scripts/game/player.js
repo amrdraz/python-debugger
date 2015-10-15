@@ -152,6 +152,13 @@
             state.severity = 'error';
             editor.updateLinting(CodeMirror.lintResult([state]));
         }
+        PD.sendActivity({
+            action: 'run',
+            event: 'python-debugger.od-sandbox',
+            meta: {
+                error: hist.error
+            }
+        });
     }
 
     function start_debugger(ev) {
@@ -163,7 +170,15 @@
         if (storage) {
             storage["py_game_src"] = src;
         }
-        Debugger.start_debugger(src, true);
+        var hist = Debugger.start_debugger(src, true);
+
+        PD.sendActivity({
+            action: 'debug',
+            event: 'python-debugger.od-sandbox',
+            meta: {
+                error: hist.error
+            }
+        });
     }
 
     function stop_debugger(ev) {

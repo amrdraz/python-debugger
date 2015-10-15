@@ -576,6 +576,7 @@
             resetOutErr();
         }
         debuggingStarted();
+        return getSessionHistory();
     }
 
     function handleDebugError(err) {
