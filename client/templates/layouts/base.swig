@@ -85,8 +85,40 @@
       {% endblock %}
     <!-- endbuild -->
     
-    <script src="scripts/brython/www/src/brython.js"></script>
+    {# <script src="scripts/brython/www/src/brython.js"></script> #}
 
+    <!-- build:js(client) scripts/brython.js -->
+    <script type="text/javascript" src="scripts/brython/www/src/brython_builtins.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/version_info.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/identifiers_re.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py2js.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_object.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_type.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_utils.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_builtin_functions.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_bytes.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_set.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/js_objects.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/stdlib_paths.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_import.js"></script>
+
+    <script type="text/javascript" src="scripts/brython/www/src/py_string.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_int.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_long_int.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_float.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_complex.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_dict.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_list.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_generator.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_dom.js"></script>
+
+    <script type="text/javascript" src="scripts/brython/www/src/builtin_modules.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_import_hooks.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/async.js"></script>
+
+    {# <script type="text/javascript" src="scripts/brython/www/src/py_VFS.js"></script> #}
+    <!-- endbuild -->
+    
     <!-- build:js(client) scripts/main.js -->
     <script src="scripts/debugger/debugger.js" type="text/javascript" charset="utf-8"></script>
     <script src="scripts/main.js" type="text/javascript" charset="utf-8"></script>
