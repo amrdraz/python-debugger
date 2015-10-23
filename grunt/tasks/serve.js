@@ -18,11 +18,11 @@ var taskConfig = function(grunt) {
     grunt.task.run([
       'clean:tmp',
       'copy:server',
-      'injector',
+      // 'injector',
       'wiredep',
       'swig:server',
       'sass:server',
-      'jsdoc:server',
+      // 'jsdoc:server',
       'autoprefixer:server'
     ]);
 

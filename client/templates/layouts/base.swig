@@ -13,7 +13,7 @@
     <meta charset="utf-8"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
     <title>Python Debugger</title>
-    <meta name="description" content=""/>
+    <meta name="description" content="An offline ready JavaScript based Python runner and debugger"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <!-- build:css(client) styles/global.css -->
       <!-- bower:css -->
@@ -22,7 +22,8 @@
       {% block extra_style %}
       {% endblock %}
     <!-- endbuild -->
-
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="styles/main.css">
     <!-- build:js(client) scripts/modernizr.js -->
     <script src="/bower_components/modernizr/modernizr.js"></script>
@@ -52,21 +53,26 @@
               <span class="icon-bar"></span>
               <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="#">Python Debugger</a>
+            <a class="navbar-brand" href="index.html">Python Debugger</a>
           </div>
           <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
-            <li>
-                <a href="https://github.com/amrdraz/python-debugger" class="btn" >
-                  Github Repo
-                </a>
-            </li>
+              <li>
+                  <a href="sandbox.html" class="btn" >
+                    Od Sandbox
+                  </a>
+              </li>
+              <li>
+                  <a href="https://github.com/amrdraz/python-debugger" class="btn" >
+                    Github Repo
+                  </a>
+              </li>
             </ul>
           </div>
         </div>
     </div>
   
-    <div class="container marketing">
+    <div class="container-fluid marketing">
     {% block content %}{% endblock %}
     </div>
     </div>
@@ -79,12 +85,47 @@
       {% endblock %}
     <!-- endbuild -->
     
-    <script src="scripts/brython/www/src/brython.js"></script>
-   <!-- build:js(client) scripts/main.js -->
-    <script src="scripts/debugger/main.js" type="text/javascript" charset="utf-8"></script>
-    <script src="scripts/debugger/user.js" type="text/javascript" charset="utf-8"></script>
-    <script src="scripts/debugger/extra_module.js" type="text/javascript" charset="utf-8"></script>
+    {# <script src="scripts/brython/www/src/brython.js"></script> #}
+
+    <!-- build:js(client) scripts/brython.js -->
+    <script type="text/javascript" src="scripts/brython/www/src/brython_builtins.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/version_info.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/identifiers_re.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py2js.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_object.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_type.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_utils.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_builtin_functions.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_bytes.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_set.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/js_objects.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/stdlib_paths.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_import.js"></script>
+
+    <script type="text/javascript" src="scripts/brython/www/src/py_string.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_int.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_long_int.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_float.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_complex.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_dict.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_list.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_generator.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_dom.js"></script>
+
+    <script type="text/javascript" src="scripts/brython/www/src/builtin_modules.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_import_hooks.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/async.js"></script>
+
+    {# <script type="text/javascript" src="scripts/brython/www/src/py_VFS.js"></script> #}
     <!-- endbuild -->
+    
+    <!-- build:js(client) scripts/main.js -->
+    <script src="scripts/debugger/debugger.js" type="text/javascript" charset="utf-8"></script>
+    <script src="scripts/main.js" type="text/javascript" charset="utf-8"></script>
+    <!-- endbuild -->
+
+    {% block extra_page_script %}
+    {% endblock %}
     
   </body>
 </html>

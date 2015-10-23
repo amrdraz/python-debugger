@@ -7,7 +7,7 @@
 var taskConfig = function(grunt) {
   grunt.registerTask('build', 'Build a production ready version of your site.', [
     'clean:dist',
-    'injector',
+    // 'injector',
     'wiredep',
     'copy:dist',
     'concurrent',

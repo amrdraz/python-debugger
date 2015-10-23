@@ -27,11 +27,13 @@
         get_recorded_states: getRecordedStates,
         unset_events: unsetCallbacks,
         reset_events: resetCallbacks,
+        define_module: defineModule,
         on_input_while_debugging: callbackSetter('handleInput'),
         on_debugging_started: callbackSetter('debugStarted'),
         on_debugging_end: callbackSetter('debugEnded'),
         on_debugging_error: callbackSetter('debugError'),
         on_step_update: callbackSetter('stepUpdate'),
+        on_line_trace: callbackSetter('lineTrace'),
     };
     var $B = win.__BRYTHON__;
     var _b_ = $B.builtins;
@@ -56,7 +58,7 @@
     var currentStep = 0;
     var noop = function() {};
 
-    var events = ['stepUpdate', 'debugStarted', 'debugError', 'debugEnded', 'handleInput'];
+    var events = ['stepUpdate', 'debugStarted', 'debugError', 'debugEnded', 'handleInput', 'lineTrace'];
     var callbacks = {};
     var default_callbacks = {};
     var temp_callbacks = null;
@@ -90,7 +92,7 @@
      * temporarely remove callback in order to stop updating who ever is listening
      */
     function unsetCallbacks() {
-        if(temp_callbacks===null) {
+        if (temp_callbacks === null) {
             temp_callbacks = callbacks;
             callbacks = default_callbacks;
         }
@@ -99,7 +101,7 @@
      * re set callback after unset
      */
     function resetCallbacks() {
-        if(temp_callbacks!==null) {
+        if (temp_callbacks !== null) {
             callbacks = temp_callbacks;
             temp_callbacks = null;
         }
@@ -308,15 +310,15 @@
             err: err,
             step: getRecordedStates().length - 1,
         };
-        trace.stdout = (getLastRecordedState()?getLastRecordedState().stdout:'') + trace.data;
+        trace.stdout = (getLastRecordedState() ? getLastRecordedState().stdout : '') + trace.data;
         trace.module_name = trace.frame[0];
         trace.line_no = trace.next_line_no = +($B.last(err.$stack)[1].$line_info.split(',')[0]);
         trace.column_no_start = 0;
         trace.column_no_stop = 200;
-        if(err.args[1] && err.args[1][1]===trace.line_no) {
+        if (err.args[1] && err.args[1][1] === trace.line_no) {
             trace.fragment = err.args[1][3];
-            trace.column_no_start = Math.max(0, err.args[1][2]-3);
-            trace.column_no_stop = err.args[1][2]+3;
+            trace.column_no_start = Math.max(0, err.args[1][2] - 3);
+            trace.column_no_stop = err.args[1][2] + 3;
         }
         didErrorOccure = true;
         if (getRecordedStates().length > 0) {
@@ -392,12 +394,14 @@
             lastState.next_line_no = state.line_no;
         }
         if (isDisposableState(state)) {
+            callbacks.lineTrace(state, Debugger);
             return;
         }
         if (state.type === 'runtime_error') {
             recordedStates.pop();
             state.stdout += state.data;
         }
+        callbacks.lineTrace(state, Debugger);
         recordedStates.push(state);
     }
 
@@ -446,7 +450,7 @@
      * @return {Boolean} whether stdIn was changed while running the code
      */
     function stdInChanged() {
-        return $B.imported.sys?($B.imported.sys.stdin !== $B.modules._sys.stdin):false;
+        return $B.imported.sys ? ($B.imported.sys.stdin !== $B.modules._sys.stdin) : false;
     }
 
     /**
@@ -457,7 +461,7 @@
      */
     function isDisposableState(state) {
         var disposable = ['afterwhile', 'eof'];
-        return disposable[state.type] !== undefined;
+        return state.type && ~disposable.indexOf(state.type);
     }
 
     function resetDebugger(rerun) {
@@ -572,6 +576,7 @@
             resetOutErr();
         }
         debuggingStarted();
+        return getSessionHistory();
     }
 
     function handleDebugError(err) {
@@ -615,8 +620,9 @@
      */
     function pythonToBrythonJS(src) {
         var obj = {
-            code: ""
-        }, module_name, local_name, current_globals_id, current_locals_name, current_globals_name;
+                code: ""
+            },
+            module_name, local_name, current_globals_id, current_locals_name, current_globals_name;
 
         firstRunCheck();
         // Initialize global and local module scope
@@ -629,16 +635,20 @@
         module_name = _b_.dict.$dict.get(_globals, '__name__', 'exec_' + $B.UUID());
         $B.$py_module_path[module_name] = $B.$py_module_path[current_globals_id];
         local_name = module_name;
-    
+
         obj.module_name = module_name;
-        if (!$B.async_enabled) { obj[module_name] = {}; }
+        if (!$B.async_enabled) {
+            obj[module_name] = {};
+        }
 
 
         // parse python into javascript
         try {
             var root = $B.py2js(src, module_name, [module_name], local_name);
             obj.code = root.to_js();
-            if ($B.async_enabled) { obj.code = $B.execution_object.source_conversion(obj.code); }
+            if ($B.async_enabled) {
+                obj.code = $B.execution_object.source_conversion(obj.code);
+            }
             //js=js.replace("@@", "\'", 'g')
         } catch (err) {
             if (err.$py_error === undefined) {
@@ -673,7 +683,7 @@
         do {
 
             newCode += code.substr(0, index);
-            if (+line.line_no!==lastLineNo) { // bug fix for brython 3.2.2 for in loop outputing identical line traces after each other
+            if (+line.line_no !== lastLineNo) { // bug fix for brython 3.2.2 for in loop outputing identical line traces after each other
                 newCode += line.indentString + traceCall + "({event:'line', frame:$B.last($B.frames_stack), line_no: " + line.line_no + ", next_line_no: " + (+line.line_no + 1) + "});\n";
             }
             newCode += line.string;
@@ -703,7 +713,7 @@
             var inputLine = getNextInput(newCode, re);
             while (inputLine !== null) {
                 code = newCode.substr(0, inputLine.index);
-                var inJect = traceCall + "({event:'input'" + (inputLine.param?", arg:"+inputLine.param:"") + ", id:'" + inputLine.index + "'})";
+                var inJect = traceCall + "({event:'input'" + (inputLine.param ? ", arg:" + inputLine.param : "") + ", id:'" + inputLine.index + "'})";
                 code += inJect;
                 index = inputLine.index + inputLine.string.length;
                 code += newCode.substr(index);
@@ -718,7 +728,9 @@
 
         function getNextLine(code) {
             var match = LINE_RGX.exec(code);
-            if (!match) { return null; }
+            if (!match) {
+                return null;
+            }
             return {
                 indent: match[1].length,
                 indentString: match[1],
@@ -732,7 +744,9 @@
 
         function getNextWhile(code) {
             var match = WHILE_RGX.exec(code);
-            if (!match) { return null; }
+            if (!match) {
+                return null;
+            }
             return {
                 indent: match[1].length,
                 indentString: match[1],
@@ -743,7 +757,9 @@
 
         function getNextFunction(code) {
             var match = FUNC_RGX.exec(code);
-            if (!match) { return null; }
+            if (!match) {
+                return null;
+            }
             return {
                 indent: match[1].length,
                 name: match[2],
@@ -768,7 +784,9 @@
 
         function getNextInput(code, re) {
             var match = re.exec(code);
-            if (!match) { return null; }
+            if (!match) {
+                return null;
+            }
             return {
                 param: match[1],
                 string: match[0],
@@ -843,8 +861,10 @@
             var root = $B.py2js(code, module_name, [module_name], local_name);
 
             var js = root.to_js();
-            
-            if (!$B.async_enabled) { eval('var $locals_' + module_name + '=  {}'); }
+
+            if (!$B.async_enabled) {
+                eval('var $locals_' + module_name + '=  {}');
+            }
             var None = _b_.None;
             var getattr = _b_.getattr;
             var setattr = _b_.setattr;
@@ -925,8 +945,8 @@
      */
     function getSessionHistory() {
         var last_state;
-        if(didErrorOccure && errorState.type==="syntax_error") {
-            last_state = errorState;       
+        if (didErrorOccure && errorState.type === "syntax_error") {
+            last_state = errorState;
         } else {
             last_state = getLastRecordedState();
         }
@@ -938,7 +958,7 @@
             globals: last_state.frame[3],
             error: didErrorOccure,
             errorState: errorState
-        };    
+        };
     }
 
     var realStdOut = $B.stdout;
@@ -993,7 +1013,7 @@
     function setOutErr(spy) {
         realStdOut = $B.stdout;
         realStdErr = $B.stderr;
-        if(spy) {
+        if (spy) {
             $B.stdout = createOut('stdout', realStdOut);
             $B.stderr = createOut('stderr', realStdErr);
         } else {
@@ -1012,8 +1032,8 @@
     /**
      * Initialize the first frame the first time Brython runs
      */
-    function firstRunCheck () {
-        if($B.frames_stack<1) {
+    function firstRunCheck() {
+        if ($B.frames_stack < 1) {
             var module_name = '__main__';
             $B.$py_module_path[module_name] = window.location.href;
             var root = $B.py2js("", module_name, module_name, '__builtins__');
@@ -1021,4 +1041,24 @@
             eval(js);
         }
     }
+
+    /**
+     * Inject a module into Brython's imported array as if it was imported
+     * This makes it possible to dynamically define modules in your application and simply import them in the code with
+     * import [module] or from [module] import [fucntion, *, etc..]
+     * @param  {String} name name of module
+     * @param  {Object} mod  module as Object
+     */
+    function defineModule(name, mod) {
+        mod.__class__ = $B.$ModuleDict,
+            mod.__name__ = name;
+        mod.__repr__ = mod.__str__ = function() {
+            return "<module '" + name + "' (built-in)>";
+        };
+        $B.imported[name] = $B.modules[name] = mod;
+    }
+
+    // defineModule('fairy', {
+    //     secret:'only faires know' 
+    // });
 })(window);

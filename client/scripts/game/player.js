@@ -1,7 +1,5 @@
-// example of using the brython debugger without initializing brython in body
 (function() {
     window.brython(1);
-
     var $B = window.__BRYTHON__;
     var _b_ = $B.builtins;
     var $io = {
@@ -9,6 +7,9 @@
         __name__: 'io'
     };
     $io.__mro__ = [$io, _b_.object.$dict];
+    var Debugger = window.Brython_Debugger;
+    
+    Debugger.define_module('game', Game.game);
 
     var doc = function(d) {
         return document.getElementById(d);
@@ -69,10 +70,10 @@
 
 
     function reset_src() {
-        if (storage && storage['py_src']) {
-            editor.setValue(storage["py_src"]);
+        if (storage && storage['py_game_src']) {
+            editor.setValue(storage["py_game_src"]);
         } else {
-            editor.setValue('for i in range(10):\n\tprint(i)');
+            editor.setValue('from game import *\nmove_right()\nset_color(black)\nmove_down()');
         }
         gotoLine(0);
     }
@@ -90,7 +91,6 @@
 
     reset_src();
 
-    var Debugger = window.Brython_Debugger;
     var cout = {
         __class__: $io,
         write: function(data) {
@@ -134,13 +134,17 @@
     function run() {
         doc("console").value = '';
         clearLint();
+        reset_game_state();
+        Game.can_draw(false);
         var src = editor.getValue();
         if (storage) {
-            storage["py_src"] = src;
+            storage["py_game_src"] = src;
         }
         Debugger.unset_events();
         var hist = Debugger.run_to_end(src);
         Debugger.reset_events();
+        Game.can_draw(true);
+        Game.game.draw();
         if(hist.error) {
             var state = hist.errorState;
             doc('console').value = state.data;
@@ -150,6 +154,7 @@
         }
         PD.sendActivity({
             action: 'run',
+            event: 'python-debugger.od-sandbox',
             meta: {
                 error: hist.error
             }
@@ -159,14 +164,17 @@
     function start_debugger(ev) {
         doc("console").value = '';
         clearLint();
+        reset_game_state();
+        Game.can_draw(false);
         var src = editor.getValue();
         if (storage) {
-            storage["py_src"] = src;
+            storage["py_game_src"] = src;
         }
-
         var hist = Debugger.start_debugger(src, true);
+
         PD.sendActivity({
             action: 'debug',
+            event: 'python-debugger.od-sandbox',
             meta: {
                 error: hist.error
             }
@@ -194,9 +202,14 @@
         doc('debug').disabled = true
         doc('step').disabled = false
         doc('stop').disabled = false
+        // reset_game_state();
+        Game.can_draw(true);
         if (Debugger.is_recorded()) {
             if (Debugger.get_recorded_states().length > 0) {
-                gotoLine(Debugger.get_recorded_states()[0].next_line_no);
+                var state = Debugger.get_recorded_states()[0];
+                gotoLine(state.next_line_no);
+                Game.set_state(state.game_next_state);
+                Game.game.draw();
             } else {
                 Debugger.stop_debugger();
             }
@@ -215,6 +228,11 @@
     }
 
     function debug_step(state) {
+
+        if(state.game_next_state) {
+            Game.set_state(state.game_next_state);
+            Game.game.draw();
+        }
 
         doc("console").value = "" + state.stdout;
 
@@ -243,13 +261,23 @@
 
 
     function debug_error(err, Debugger) {
-        // if (Debugger.get_recorded_states().length === 0) {
-        //     doc('console').value = err.data;
-        //     Debugger.stop_debugger();
-        // }
-        // err.severity = 'error';
         
-        // editor.updateLinting(CodeMirror.lintResult([err]));
+    }
+
+    function  reset_game_state() {
+        if(Debugger.is_debugging) { Debugger.stop_debugger(); }
+        Game.set_state(Game.game.initialState);
+        Game.game.draw();
+    }
+
+    function  set_state(state, Debugger) {
+        state.game_state = Game.get_state();
+        var lastState = Debugger.get_recorded_states()[Debugger.get_recorded_states().length-1];
+        if(lastState) {
+            lastState.game_next_state = state.game_state;
+        } else {
+            state.game_next_state = state.game_state;
+        }
     }
 
     function show_js(ev) {
@@ -263,6 +291,7 @@
     Debugger.on_debugging_end(debug_stoped);
     Debugger.on_debugging_error(debug_error);
     Debugger.on_step_update(debug_step);
+    Debugger.on_line_trace(set_state);
 
 
     doc('run').addEventListener('click', run);
@@ -270,4 +299,5 @@
     doc('step').addEventListener('click', step_debugger);
     doc('back').addEventListener('click', step_back_debugger);
     doc('stop').addEventListener('click', stop_debugger);
+    doc('reset').addEventListener('click', reset_game_state);
 })();

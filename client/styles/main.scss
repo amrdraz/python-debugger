@@ -32,6 +32,7 @@ $input-border-radius: 0;
 $input-border-focus: #2598f9;
 
 @import '../../bower_components/bootstrap-sass/assets/stylesheets/_bootstrap.scss';
+@import 'cm-styles.scss';
 
 //override
 
@@ -122,4 +123,26 @@ body {
 
 .font-control pre, .font-control textarea {
     font-size: 20px!important;
+}
+
+#console.game-console {
+    height: auto;
+    min-height: 120px;
+    max-height: 120px;
+}
+
+.game-stage {
+    text-align: center;
+}
+.game-stage canvas {
+    margin: 0 auto;
+    display: block;
+}
+.game-control {
+    margin: 0 auto;
+}
+
+#turtlecanvas {
+   background:#fff;
+   border: 1px solid red;
 }
