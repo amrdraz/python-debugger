@@ -3,9 +3,6 @@ from _sys import *
 _getframe = Getframe
 from javascript import JSObject
 
-has_local_storage=__BRYTHON__.has_local_storage
-has_session_storage = __BRYTHON__.has_session_storage
-has_json=__BRYTHON__.has_json
 brython_debug_mode = __BRYTHON__.debug
 
 argv = ['__main__']
@@ -20,6 +17,8 @@ byteorder='little'
 
 def exc_info():
     exc = __BRYTHON__.current_exception
+    if exc is None:
+        return(None, None, None)
     return (exc.__class__,exc,exc.traceback)
     
 exec_prefix = __BRYTHON__.brython_path

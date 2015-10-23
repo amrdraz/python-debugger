@@ -77,7 +77,7 @@ var $op_order = [['or'],['and'],
     ['+'],
     ['-'],
     ['*','/','//','%'],
-    ['unary_neg','unary_inv'],
+    ['unary_neg','unary_inv','unary_pos'],
     ['**']
 ]
 
@@ -103,7 +103,7 @@ Function called in case of SyntaxError
 */
 
 function $_SyntaxError(context,msg,indent){
-    //console.log('syntax error, context '+context+' msg '+msg)
+    console.log('syntax error, context '+context+' msg '+msg)
     var ctx_node = context
     while(ctx_node.type!=='node'){ctx_node=ctx_node.parent}
     var tree_node = ctx_node.node
@@ -1166,7 +1166,7 @@ function $CallCtx(context){
                    // form " -(x+2) "
                    switch(this.func.op) {
                       case '+':
-                        return $to_js(this.tree)
+                        return 'getattr('+$to_js(this.tree)+',"__pos__")()'
                       case '-':
                         return 'getattr('+$to_js(this.tree)+',"__neg__")()'
                       case '~':
@@ -2106,7 +2106,7 @@ function $DefCtx(context){
         if(last_instr.type!=='return' && this.type!='generator'){
             new_node = new $Node()
             new $NodeJSCtx(new_node,
-                ';$B.leave_frame();return None;')
+                ';$B.leave_frame("'+this.id+'");return None;')
             def_func_node.add(new_node)
         }
 
@@ -2755,7 +2755,7 @@ function $ForExpr(context){
         var catch_node = new $Node()
 
         var js = 'catch($err){if($B.is_exc($err,[StopIteration]))'
-        js += '{delete $locals["$next'+num+'"];break;}'
+        js += '{delete $locals["$next'+num+'"];$B.clear_exc();break;}'
         js += 'else{throw($err)}}'        
 
         new $NodeJSCtx(catch_node,js)
@@ -2793,6 +2793,30 @@ function $FromCtx(context){
         if(name=='*'){this.scope.blurred = true}
     }
     
+    this.transform = function(node, rank){
+        if(!this.blocking){
+            // Experimental : for non blocking import, wrap code after the
+            // "from" statement in a function
+            var mod_name = this.module.replace(/\$/g,'')
+            if(this.names[0]=='*'){
+                node.add($NodeJS('for(var $attr in $B.imported["'+mod_name+
+                    '"]){$locals[$attr]=$B.imported["'+mod_name+'"][$attr]};'))
+            }else{
+                for(var i=0;i<this.names.length;i++){
+                    var name = this.names[i]
+                    node.add($NodeJS('$locals["'+(this.aliases[name]||name)+
+                        '"]=$B.imported["'+mod_name+'"]["'+name+'"]'))
+                }
+            }
+
+            for(var i=rank+1;i<node.parent.children.length;i++){
+                node.add(node.parent.children[i])
+            }
+            node.parent.children.splice(rank+1, node.parent.children.length)
+            node.parent.add($NodeJS(')'))
+        }
+    }
+    
     this.bind_names = function(){
         // Called at the end of the 'from' statement
         // Binds the names or aliases in current scope
@@ -2827,6 +2851,8 @@ function $FromCtx(context){
                 }
                 if(package===undefined){
                     return 'throw SystemError("Parent module \'\' not loaded, cannot perform relative import")'
+                }else if(package=='None'){
+                    console.log('package is None !')
                 }else{
                     packages.push(package)
                 }
@@ -2837,19 +2863,37 @@ function $FromCtx(context){
         }
         if(_mod){packages.push(_mod)}
         this.module = packages.join('.')
-
+        
         // FIXME : Replacement still needed ?
         var mod_name = this.module.replace(/\$/g,''),
             localns = '$locals_'+scope.id.replace(/\./g,'_');
-        res[pos++] = '$B.$import("';
-        res[pos++] = mod_name+'",["';
-        res[pos++] = this.names.join('","')+'"], {';
-        var sep = '';
-        for (var attr in this.aliases) {
-            res[pos++] = sep + '"'+attr+'": "'+this.aliases[attr]+'"';
-            sep = ',';
+        if(this.blocking){
+            res[pos++] = '$B.$import("';
+            res[pos++] = mod_name+'",["';
+            res[pos++] = this.names.join('","')+'"], {';
+            var sep = '';
+            for (var attr in this.aliases) {
+                res[pos++] = sep + '"'+attr+'": "'+this.aliases[attr]+'"';
+                sep = ',';
+            }
+            res[pos++] = '}, {}, true);';
+            
+            // Add names to local namespace
+            if(this.names[0]=='*'){
+                res[pos++] = '\n'+head+'for(var $attr in $B.imported["'+mod_name+
+                    '"]){$locals[$attr]=$B.imported["'+mod_name+'"][$attr]};'
+            }else{
+                for(var i=0;i<this.names.length;i++){
+                    var name = this.names[i]
+                    res[pos++] = '\n'+head+'$locals["'+(this.aliases[name]||name)+
+                        '"]=$B.imported["'+mod_name+'"]["'+name+'"];'
+                }
+            }
+            res[pos++] = '\n'+head+'None;';
+
+        }else{
+            res[pos++] = '$B.$import_non_blocking("'+mod_name+'", function()'
         }
-        res[pos++] = '}, '+localns+');';
                      
         if(this.names[0]=='*'){
             // Set attribute to indicate that the scope has a 
@@ -2857,7 +2901,6 @@ function $FromCtx(context){
             scope.blurred = true
         }
 
-        res[pos++] = '\n'+head+'None;';
         return res.join('');
     }
 }
@@ -3133,6 +3176,17 @@ function $IdCtx(context,value){
         else if(val=='__BRYTHON__' || val == '$B'){return val}
 
         var innermost = $get_scope(this)
+        /*
+        if(val=='list'){
+            console.log(val, 'innermost', innermost)
+            var node = $get_node(this), scope=innermost
+            console.log('locals', node.locals)
+            while(scope){
+                console.log('locals of scope', scope.id, scope.locals)
+                scope = scope.parent_block
+            }
+        }
+        */
         var scope = innermost, found=[], module = scope.module
         
         // get global scope
@@ -3240,6 +3294,16 @@ function $IdCtx(context,value){
                     }
                 }else if(scope.id==scope.module){
                     if(!this.bound && scope===innermost && this.env[val]===undefined){
+                        var locs = $get_node(this).locals || {}
+                        if(locs[val]===undefined){
+                            // Name is bound in scope, but after the current node
+                            // If it is a builtin name, use the builtin
+                            // Cf issue #311
+                            if(found.length>1 && found[1].id == '__builtins__'){
+                                this.is_builtin = true
+                                return val+$to_js(this.tree,'')
+                            }
+                        }
                         return '$B.$search("'+val+'", $locals_'+scope.id.replace(/\./g,'_')+')'
                     }
                     val = scope_ns+'["'+val+'"]'
@@ -3332,12 +3396,82 @@ function $ImportCtx(context){
                     this.tree[i].alias + '"}'),
                 localns = '$locals_'+scope.id.replace(/\./g,'_');
             res[pos++] = '$B.$import("'+mod_name+'", [],'+aliases+',' +
-                                   localns + ');'
+                                   localns + ', true);'
         }
         // add None for interactive console
         return res.join('') + 'None;'
     }
 }
+
+function $IMPRTCtx(context){
+    // Class for keyword "import"
+    this.type = 'import'
+    this.parent = context
+    this.tree = []
+    context.tree[context.tree.length]=this
+    this.expect = 'id'
+
+    this.toString = function(){return 'import '+this.tree}
+    
+    this.bind_names = function(){
+        // For "import X", set X in the list of names bound in current scope
+        var scope = $get_scope(this)
+        for(var i=0;i<this.tree.length;i++){
+            if(this.tree[i].name==this.tree[i].alias){
+                var name = this.tree[i].name,
+                    parts = name.split('.'),
+                    bound = name
+                if(parts.length>1){
+                    bound = parts[0]
+                }
+            }else{
+                bound = this.tree[i].alias
+            }
+            $B.bound[scope.id][bound] = true
+            $B.type[scope.id][bound] = 'module'
+        }
+    }
+    
+    this.transform = function(node, rank){
+        // If there are more than one module name, split line
+        for(var i=1;i<this.tree.length;i++){
+            var new_node = new $Node()
+            var ctx = new $IMPRTCtx(new $NodeCtx(new_node))
+            ctx.tree = [this.tree[i]]
+            node.parent.insert(rank+1, new_node)
+        }
+        this.tree.splice(1, this.tree.length)
+        // All the code that starts after IMPRT is put in a function
+        // called when the module has finished importing
+        var name = this.tree[0].name,
+            js = '$locals["'+this.tree[0].alias+'"]= $B.imported["'+name+'"]'
+        node.add($NodeJS(js))
+        for(var i=rank+1;i<node.parent.children.length;i++){
+            node.add(node.parent.children[i])
+        }
+        node.parent.children.splice(rank+1, node.parent.children.length)
+        node.parent.add($NodeJS(')'))
+    }
+    
+    this.to_js = function(){
+        this.js_processed=true
+        var scope = $get_scope(this)
+        var mod = scope.module
+
+        var res = [], pos=0
+        for(var i=0;i<this.tree.length;i++){
+            var mod_name = this.tree[i].name,
+                aliases = (this.tree[i].name == this.tree[i].alias)?
+                    '{}' : ('{"' + mod_name + '" : "' +
+                    this.tree[i].alias + '"}'),
+                localns = '$locals_'+scope.id.replace(/\./g,'_');
+            res[pos++] = '$B.$import_non_blocking("'+mod_name+'", function()'
+        }
+        // add None for interactive console
+        return res.join('')
+    }
+}
+
 
 function $ImportedModuleCtx(context,name){
     this.type = 'imported module'
@@ -3820,10 +3954,12 @@ function $OpCtx(context,op){
           case 'not_in':
             return '!$B.$is_member('+$to_js(this.tree)+')'
           case 'unary_neg':
+          case 'unary_pos':
           case 'unary_inv':
             // For unary operators, the left operand is the unary sign(s)
             var op, method
             if(this.op=='unary_neg'){op='-';method='__neg__'}
+            else if(this.op=='unary_pos'){op='-';method='__pos__'}
             else{op='~';method='__invert__'}
             // for integers or float, replace their value using
             // Javascript operators
@@ -4090,9 +4226,32 @@ function $ReturnCtx(context){
         if(scope.ntype=='generator'){
             return 'return [$B.generator_return(' + $to_js(this.tree)+')]'
         }
-        return 'var $res = '+$to_js(this.tree)+';'+
-            'if($B.frames_stack.length>1){$B.frames_stack.pop()}'+
-            ';return $res'
+        // In most cases, returning from a function means leaving the 
+        // execution frame ; but if the return is in a "try" with a "finally"
+        // clause, we must remain in the same frame
+        var node = $get_node(this),
+            leave_frame = true
+        
+        while(node && leave_frame){
+            if(node.is_try){
+                pnode = node.parent, flag=false
+                for(var i=0;i<pnode.children.length;i++){
+                    var child = pnode.children[i]
+                    if(!flag && child===node){flag=true;continue}
+                    if(flag){
+                        if(child.context.tree[0].type=="single_kw" &&
+                            child.context.tree[0].token=="finally"){
+                                leave_frame = false
+                                break
+                        }
+                    }
+                }
+            }
+            node = node.parent
+        }
+        var res = 'var $res = '+$to_js(this.tree)+';'
+        if(leave_frame){res += '$B.leave_frame($local_name);'}
+        return res+'return $res'
     }
 }
 
@@ -4974,9 +5133,6 @@ function $transition(context,token){
           case 'op':
             var tg = arguments[2]
             switch(tg) {
-              case '+':
-                // ignore unary +
-                return context
               case '*':
                 context.parent.tree.pop() // remove abstract expression
                 var commas = context.with_commas
@@ -4984,11 +5140,13 @@ function $transition(context,token){
                 return new $PackedCtx(new $ExprCtx(context,'expr',commas))
               case '-':
               case '~':
+              case '+':
                 // create a left argument for operator "unary"
                 context.parent.tree.pop()
                 var left = new $UnaryCtx(context.parent,tg)
                 // create the operator "unary"
                 if(tg=='-'){var op_expr = new $OpCtx(left,'unary_neg')}
+                else if(tg=='+'){var op_expr = new $OpCtx(left,'unary_pos')}
                 else{var op_expr = new $OpCtx(left,'unary_inv')}
                 return new $AbstractExprCtx(op_expr,false)
             }
@@ -5073,10 +5231,9 @@ function $transition(context,token){
             switch(arguments[2]) {
               case '-':
               case '~':
+              case '+':
                 context.expect = ','
                 return $transition(new $CallArgCtx(context),token,arguments[2])
-              case '+':
-                return context
               case '*':
                 context.has_star = true;
                 return new $StarArgCtx(context)
@@ -5347,6 +5504,7 @@ function $transition(context,token){
                         var left = new $UnaryCtx(context,arguments[2])
                         // create the operator "unary"
                         if(arguments[2]=='-'){var op_expr = new $OpCtx(left,'unary_neg')}
+                        else if(arguments[2]=='+'){var op_expr = new $OpCtx(left,'unary_pos')}
                         else{var op_expr = new $OpCtx(left,'unary_inv')}
                         return new $AbstractExprCtx(op_expr,false)
                     }//switch
@@ -5666,6 +5824,8 @@ function $transition(context,token){
               return context
             }
           case 'import':
+          case 'IMPRT':
+            context.blocking = token=='import'
             if(context.expect==='module'){
               context.expect = 'id'
               return context
@@ -6084,6 +6244,8 @@ function $transition(context,token){
             return new $FromCtx(context)
           case 'import':
             return new $ImportCtx(context)
+          case 'IMPRT': // experimental for non blocking imports
+            return new $IMPRTCtx(context)
           case 'global':
             return new $GlobalCtx(context)
           case 'nonlocal':
@@ -6342,14 +6504,15 @@ function $transition(context,token){
             else if(context.op==='~'){value=~value}
             return $transition(context.parent.parent,token,value)
           case 'id':
-            // replace by x.__neg__(), x.__invert__ or x
+            // replace by x.__neg__(), x.__invert__ or x.__pos__
             context.parent.parent.tree.pop()
             var expr = new $ExprCtx(context.parent.parent,'call',false)
             var expr1 = new $ExprCtx(expr,'id',false)
             new $IdCtx(expr1,arguments[2]) // create id
-            if (context.op !== '+'){
+            if (true){ //context.op !== '+'){
                var repl = new $AttrCtx(expr)
-               if(context.op==='-'){repl.name='__neg__'}
+               if(context.op==='+'){repl.name='__pos__'}
+               else if(context.op==='-'){repl.name='__neg__'}
                else{repl.name='__invert__'}
                // method is called with no argument
                var call = new $CallCtx(expr)
@@ -6456,7 +6619,8 @@ function $tokenize(src,module,locals_id,parent_block_id,line_info){
         "for","lambda","try","finally","raise","def","from",
         "nonlocal","while","del","global","with",
         "as","elif","else","if","yield","assert","import",
-        "except","raise","in","not","pass","with","continue","__debugger__"
+        "except","raise","in","not","pass","with","continue","__debugger__",
+        "IMPRT" // experimental for non blocking import
         //"False","None","True","continue",
         // "and',"or","is"
         ]
@@ -6618,6 +6782,11 @@ function $tokenize(src,module,locals_id,parent_block_id,line_info){
                             escaped=true;end+=1
                         }
                     }
+                } else if(src.charAt(end)=='\n' && _type!='triple_string'){
+                    // In a string with single quotes, line feed not following
+                    // a backslash raises SyntaxError
+                    $pos = end
+                    $_SyntaxError(context, ["EOL while scanning string literal"])
                 } else if(src.charAt(end)==car){
                     if(_type=="triple_string" && src.substr(end,3)!=car+car+car){
                         zone += src.charAt(end)
@@ -7030,7 +7199,7 @@ $B.py2js = function(src, module, locals_id, parent_block_id, line_info){
     
     // leave frame at the end of module
     var new_node = new $Node()
-    new $NodeJSCtx(new_node,'\n;$B.leave_frame("'+module+'");\n')
+    new $NodeJSCtx(new_node,'\n;$B.leave_frame("'+locals_id+'");\n')
     root.add(new_node)
 
     return root
@@ -7086,25 +7255,31 @@ function brython(options){
     // - finder_path : search module at different urls
     
     var meta_path = []
+    var path_hooks = []
 
     // $B.use_VFS is set to true if the script py_VFS.js or brython_dist.js
     // has been loaded in the page. In this case we use the VFS
-    if($B.use_VFS){meta_path.push($B.meta_path[0])}
-    // Otherwise, remove the function using VFS in $B.path_hooks
-    else{$B.path_hooks.shift()}
+    if($B.use_VFS){
+        meta_path.push($B.$meta_path[0])
+        path_hooks.push($B.$path_hooks[0])
+    }
 
     if(options.static_stdlib_import!==false){
         // Add finder using static paths
-        meta_path.push($B.meta_path[1])
+        meta_path.push($B.$meta_path[1])
         // Remove /Lib and /libs in sys.path :
         // if we use the static list and the module
         // was not find in it, it's no use searching twice in the same place
-        $B.path.shift()
-        $B.path.shift()
+        if($B.path.length>3) {
+            $B.path.shift()
+            $B.path.shift()
+        }
     }
     // Always use the defaut finder using sys.path
-    meta_path.push($B.meta_path[2])
-    $B.meta_path = meta_path   
+    meta_path.push($B.$meta_path[2])
+    $B.meta_path = meta_path
+    path_hooks.push($B.$path_hooks[1])
+    $B.path_hooks = path_hooks  
     
     // Option to run code on demand and not all the scripts defined in a page
     // The following lines are included to allow to run brython scripts in
@@ -7211,13 +7386,31 @@ function brython(options){
             throw $err
         }
     }else{
+        // Get all explicitely defined ids, to avoid overriding
+        var defined_ids = {}
+        for(var i=0;i<$elts.length;i++){
+            var elt = $elts[i]
+            if(elt.id){
+                if(defined_ids[elt.id]){
+                    throw Error("Brython error : Found 2 scripts with the same id '"+
+                        elt.id+"'")
+                }else{
+                    defined_ids[elt.id] = true
+                }
+            }
+        }
         for(var $i=0;$i<$elts.length;$i++){
             var $elt = $elts[$i]
             if($elt.type=="text/python"||$elt.type==="text/python3"){
 
                 if($elt.id){module_name=$elt.id}
-                else if(first_script){module_name='__main__'; first_script=false}
-                else{module_name = '__main__'+$B.UUID()}
+                else{
+                    if(first_script){module_name='__main__'; first_script=false}
+                    else{module_name = '__main__'+$B.UUID()}
+                    while(defined_ids[module_name]!==undefined){
+                        module_name = '__main__'+$B.UUID()
+                    }
+                }
                 $B.scripts.push(module_name)
             
                 // Get Python source code

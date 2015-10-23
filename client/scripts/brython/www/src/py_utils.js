@@ -460,8 +460,9 @@ $B.set_list_key = function(obj,key,value){
     try{key = $B.$GetInt(key)}
     catch(err){
         if(_b_.isinstance(key, _b_.slice)){
-            return $B.set_list_slice_step(obj,key.start,
-                key.stop,key.step,value)
+            var s = _b_.slice.$dict.$conv_for_seq(key, obj.length)
+            return $B.set_list_slice_step(obj,s.start,
+                s.stop,s.step,value)
         }
     }
     if(key<0){key+=obj.length}
@@ -829,31 +830,8 @@ $B.pyobject2jsobject=function (obj){
     if (_b_.hasattr(obj, '__dict__')) {
        return $B.pyobject2jsobject(_b_.getattr(obj, '__dict__'))
     }
-    throw _b_.TypeError(str(obj)+' is not JSON serializable')
-}
-
-
-// override IDBObjectStore's add, put, etc functions since we need
-// to convert python style objects to a js object type
-
-if (window.IDBObjectStore !== undefined) {
-    window.IDBObjectStore.prototype._put=window.IDBObjectStore.prototype.put
-    window.IDBObjectStore.prototype.put=function(obj, key) {
-       var myobj = $B.pyobject2jsobject(obj)
-       return window.IDBObjectStore.prototype._put.apply(this, [myobj, key]);
-    }
-    
-    window.IDBObjectStore.prototype._add=window.IDBObjectStore.prototype.add
-    window.IDBObjectStore.prototype.add=function(obj, key) {
-       var myobj= $B.pyobject2jsobject(obj);
-       return window.IDBObjectStore.prototype._add.apply(this, [myobj, key]);
-    }
-}
-
-if (window.IDBRequest !== undefined) {
-    window.IDBRequest.prototype.pyresult=function() {
-       return $B.jsobject2pyobject(this.result);
-    }
+    console.log('error', obj)
+    throw _b_.TypeError(_b_.str(obj)+' is not JSON serializable')
 }
 
 $B.set_line = function(line_num,module_name){
@@ -1015,17 +993,58 @@ $B.$GetInt=function(value) {
       "' object cannot be interpreted as an integer")
 }
 
+$B.PyNumber_Index = function(item){
+    switch(typeof item){
+        case "boolean":
+            return item ? 1 : 0
+        case "number":
+            return item
+        case "object":
+            if(item.__class__===$B.LongInt.$dict){return item}
+            var method = _b_.getattr(item, '__index__', null)
+            if(method!==null){
+                return $B.int_or_bool(_b_.getattr(method, '__call__')())
+            }
+        default:
+            throw _b_.TypeError("'"+$B.get_class(item).__name__+
+                "' object cannot be interpreted as an integer")
+    }
+}
+
 $B.int_or_bool = function(v){
     switch(typeof v){
-        case "bool":
+        case "boolean":
             return v ? 1 : 0
         case "number":
             return v
         case "object":
             if(v.__class__===$B.LongInt.$dict){return v}
+            else{
+                throw _b_.TypeError("'"+$B.get_class(v).__name__+
+                "' object cannot be interpreted as an integer")
+            }
         default:
             throw _b_.TypeError("'"+$B.get_class(v).__name__+
                 "' object cannot be interpreted as an integer")
+    }
+}
+
+$B.int_value = function(v){
+    // If v is an integer, return v
+    // If it's a boolean, return 0 or 1
+    // If it's a complex with v.imag=0, return int_value(v.real)
+    // If it's a float that equals an integer, return it
+    // Else throw ValueError
+    try{return $B.int_or_bool(v)}
+    catch(err){
+        if(_b_.isinstance(v, _b_.complex) && v.imag==0){
+            return $B.int_or_bool(v.real)
+        }else if(isinstance(v, _b_.float) && v==Math.floor(v)){
+            return Math.floor(v)
+        }else{
+            throw _b_.TypeError("'"+$B.get_class(v).__name__+
+                "' object cannot be interpreted as an integer")
+        }
     }
 }
 
@@ -1034,10 +1053,11 @@ $B.enter_frame = function(frame){
     $B.frames_stack[$B.frames_stack.length]=frame
 }
 
-$B.leave_frame = function(){
+$B.leave_frame = function(arg){
     // We must leave at least the frame for the main program
     if($B.frames_stack.length>1){
-        $B.frames_stack.pop()
+        var top = $B.last($B.frames_stack)
+       $B.frames_stack.pop()
         //delete $B.modules[frame[0]],$B.$py_src[frame[0]]
     }
 }
@@ -1062,12 +1082,30 @@ $B.add = function(x,y){
         return res
     }else{return z}
 }
+
 $B.div = function(x,y){
     var z = x/y
     if(x>min_int && x<max_int && y>min_int && y<max_int
         && z>min_int && z<max_int){return z}
-    else{return z}
+    else{
+        return $B.LongInt.$dict.__truediv__($B.LongInt(x), $B.LongInt(y))
+    }
 }
+
+$B.eq = function(x,y){
+    if(x>min_int && x<max_int && y>min_int && y<max_int){return x==y}
+    return $B.LongInt.$dict.__eq__($B.LongInt(x), $B.LongInt(y))
+}
+
+$B.floordiv = function(x,y){
+    var z = x/y
+    if(x>min_int && x<max_int && y>min_int && y<max_int
+        && z>min_int && z<max_int){return Math.floor(z)}
+    else{
+        return $B.LongInt.$dict.__floordiv__($B.LongInt(x), $B.LongInt(y))
+    }
+}
+
 $B.mul = function(x,y){
     var z = x*y
     if(x>min_int && x<max_int && y>min_int && y<max_int
@@ -1086,7 +1124,7 @@ $B.sub = function(x,y){
         return $B.LongInt.$dict.__sub__($B.LongInt(x), $B.LongInt(y))
     }else{return z}
 }
-// gretaer or equal
+// greater or equal
 $B.ge = function(x,y){
     if(typeof x=='number' && typeof y== 'number'){return x>=y}
     // a safe int is >= to a long int if the long int is negative
