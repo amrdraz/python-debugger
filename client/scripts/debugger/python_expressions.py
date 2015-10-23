@@ -1,3 +1,7 @@
+import math
+
+s = math.sqrt(eval(input("enter something to square root")))
+
 # python expressions
 
 1
