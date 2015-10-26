@@ -312,7 +312,7 @@
         };
         trace.stdout = (getLastRecordedState() ? getLastRecordedState().stdout : '') + trace.data;
         trace.module_name = trace.frame[0];
-        trace.line_no = trace.next_line_no = +($B.last(err.$stack)[1].$line_info.split(',')[0]);
+        trace.line_no = trace.next_line_no = $B.last(err.$stack)[1].$line_info?(+($B.last(err.$stack)[1].$line_info.split(',')[0])):-1;
         trace.column_no_start = 0;
         trace.column_no_stop = 200;
         if (err.args[1] && err.args[1][1] === trace.line_no) {
