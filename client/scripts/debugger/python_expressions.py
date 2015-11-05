@@ -143,3 +143,9 @@ def rec(n):
     rec(n-1)
 
 rec(2)
+
+def print_nums(x):
+  for i in range(x):
+    print(i)
+
+print_nums(10)
