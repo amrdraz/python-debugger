@@ -76,7 +76,7 @@
     };
 
     // used in trace injection
-    var LINE_RGX = /^( *);\$locals\.\$line_info=\"(\d+),(.+)\";/m;
+    var LINE_RGX = /^( *);?\$locals\.\$?line_info=\"(\d+),(.+)\";?/m;
     var WHILE_RGX = /^( *)while/m;
     var FUNC_RGX = /^( *)\$locals.*\[\"(.+)\"\]=\(function\(\){/m;
     var INPUT_RGX = /getattr\(input,\"__call__\"\)\(((?:\"(.)*\")|\d*)\)/g; // only works for string params
@@ -311,14 +311,21 @@
             step: getRecordedStates().length - 1,
         };
         trace.stdout = (getLastRecordedState() ? getLastRecordedState().stdout : '') + trace.data;
-        trace.module_name = trace.frame[0];
-        trace.line_no = trace.next_line_no = $B.last(err.$stack)[1].$line_info?(+($B.last(err.$stack)[1].$line_info.split(',')[0])):-1;
+        if (trace.frame){
+            trace.module_name = trace.frame[0];
+            trace.line_no = trace.next_line_no = trace.frame[1].$line_info?(+(trace.frame[1].$line_info.split(',')[0])):-1;
+        }
         trace.column_no_start = 0;
         trace.column_no_stop = 200;
-        if (err.args[1] && err.args[1][1] === trace.line_no) {
-            trace.fragment = err.args[1][3];
-            trace.column_no_start = Math.max(0, err.args[1][2] - 3);
-            trace.column_no_stop = err.args[1][2] + 3;
+        if (err.args.length > 3) {
+            info = "module " + err.args[1] + " line "+ err.args[2] + "\n" + err.args[4] + "\n"
+            info += Array.apply(null, Array(err.args[3])).join(" ") + "^\n"
+            info += err.__name__ + ": " + err.args[0]
+            trace.data = info;
+            trace.fragment = err.args[4];
+            trace.column_no_start = Math.max(0, err.args[3] - 1);
+            trace.column_no_stop = err.args[3] + 2;
+            trace.line_no = trace.line_no || err.args[2]
         }
         didErrorOccure = true;
         if (getRecordedStates().length > 0) {
@@ -624,27 +631,33 @@
             },
             module_name, local_name, current_globals_id, current_locals_name, current_globals_name;
 
-        firstRunCheck();
-        // Initialize global and local module scope
+        // firstRunCheck();
         var current_frame = $B.frames_stack[$B.frames_stack.length - 1];
-        var current_locals_id = current_frame[0];
-        current_locals_name = current_locals_id.replace(/\./, '_');
-        current_globals_id = current_frame[2] || current_locals_id;
-        current_globals_name = current_globals_id.replace(/\./, '_');
-        var _globals = _b_.dict([]);
-        module_name = _b_.dict.$dict.get(_globals, '__name__', 'exec_' + $B.UUID());
-        $B.$py_module_path[module_name] = $B.$py_module_path[current_globals_id];
-        local_name = module_name;
-
+        if (current_frame===undefined) {
+            module_name = '__main__';
+            if ($B.$py_src[module_name]) { delete $B.$py_src[module_name]; }
+            $B.$py_module_path[module_name] = window.location.href;
+            local_name = '__builtins__';
+        } else {
+            // Initialize global and local module scope
+            var current_locals_id = current_frame[0];
+            current_locals_name = current_locals_id.replace(/\./, '_');
+            current_globals_id = current_frame[2] || current_locals_id;
+            current_globals_name = current_globals_id.replace(/\./, '_');
+            var _globals = _b_.dict([]);
+            module_name = _b_.dict.$dict.get(_globals, '__name__', 'exec_' + $B.UUID());
+            $B.$py_module_path[module_name] = $B.$py_module_path[current_globals_id];
+            local_name = module_name;
+        }
+        
         obj.module_name = module_name;
         if (!$B.async_enabled) {
             obj[module_name] = {};
         }
 
-
         // parse python into javascript
         try {
-            var root = $B.py2js(src, module_name, [module_name], local_name);
+            var root = $B.py2js(src, module_name, module_name, local_name);
             obj.code = root.to_js();
             if ($B.async_enabled) {
                 obj.code = $B.execution_object.source_conversion(obj.code);
@@ -697,13 +710,13 @@
                 break;
             }
 
-            whileLine = getNextWhile(code);
-            if (whileLine && whileLine.index < line.index) { // then I'm about to enter a while loop
-                code = injectWhileEndTrace(code, whileLine, lastLineNo); // add a trace at the end of the while block
-            }
+            // whileLine = getNextWhile(code);
+            // if (whileLine && whileLine.index < line.index) { // then I'm about to enter a while loop
+            //     code = injectWhileEndTrace(code, whileLine, lastLineNo); // add a trace at the end of the while block
+            // }
             index = line.index;
         } while (true);
-        var codesplit = code.split(/^\;\$B\.leave_frame\(/m);
+        var codesplit = code.split(/^.*\$B\.leave_frame\(/m);
         newCode += codesplit[0] + traceCall + "({event:'line', type:'eof', frame:$B.last($B.frames_stack), line_no: " + (++largestLine) + ", next_line_no: " + (largestLine) + "});\n";
         newCode += ';$B.leave_frame(' + codesplit[1];
 
@@ -804,7 +817,7 @@
      */
     function runTrace(obj) {
         var js = obj.code;
-        firstRunCheck();
+        // firstRunCheck();
         // Initialise locals object
         try {
             eval('var $locals_' + obj.module_name + '= obj["' + obj.module_name + '"]');
@@ -849,11 +862,12 @@
         resetDebugger();
         var module_name, local_name, current_globals_id, current_locals_name, current_globals_name;
         // Initialize global and local module scope
-        firstRunCheck();
+        // firstRunCheck();
 
         var current_frame = $B.frames_stack[$B.frames_stack.length - 1];
         if (current_frame===undefined) {
-             var module_name = '__main__';
+            module_name = '__main__';
+            if ($B.$py_src[module_name]) { delete $B.$py_src[module_name]; }
             $B.$py_module_path[module_name] = window.location.href;
             local_name = '__builtins__';
         } else {
@@ -956,6 +970,7 @@
         var last_state;
         if (didErrorOccure && errorState.type === "syntax_error") {
             last_state = errorState;
+            errorState.frame = errorState.frame || {}
         } else {
             last_state = getLastRecordedState();
         }

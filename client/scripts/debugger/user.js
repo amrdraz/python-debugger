@@ -140,10 +140,13 @@
         }
 
         doc('run').disabled = true
-        Debugger.unset_events();
-        var hist = Debugger.run_to_end(src);
-        Debugger.reset_events();
-        doc('run').disabled = false;
+        try {
+            Debugger.unset_events();
+            var hist = Debugger.run_to_end(src);
+            Debugger.reset_events();
+        } finally {
+            doc('run').disabled = false;
+        }
         if(hist.error) {
             var state = hist.errorState;
             doc('console').value = state.data;
@@ -166,8 +169,18 @@
         if (storage) {
             storage["py_src"] = src;
         }
-
-        var hist = Debugger.start_debugger(src, true);
+        try {
+            var hist = Debugger.start_debugger(src, true);
+        } finally {
+            doc('run').disabled = false;
+        }
+        if(hist.error) {
+            var state = hist.errorState;
+            doc('console').value = state.data;
+            state.message = state.name+": "+state.message;
+            state.severity = 'error';
+            editor.updateLinting(CodeMirror.lintResult([state]));
+        }
         PD.sendActivity({
             action: 'debug',
             meta: {

@@ -96,6 +96,8 @@
     <script type="text/javascript" src="scripts/brython/www/src/py_type.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/py_utils.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/py_builtin_functions.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_exceptions.js"></script>
+    <script type="text/javascript" src="scripts/brython/www/src/py_range_slice.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/py_bytes.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/py_set.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/js_objects.js"></script>
