@@ -138,9 +138,12 @@
         if (storage) {
             storage["py_src"] = src;
         }
+
+        doc('run').disabled = true
         Debugger.unset_events();
         var hist = Debugger.run_to_end(src);
         Debugger.reset_events();
+        doc('run').disabled = false;
         if(hist.error) {
             var state = hist.errorState;
             doc('console').value = state.data;

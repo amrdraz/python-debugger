@@ -312,7 +312,7 @@
         };
         trace.stdout = (getLastRecordedState() ? getLastRecordedState().stdout : '') + trace.data;
         trace.module_name = trace.frame[0];
-        trace.line_no = trace.next_line_no = +($B.last(err.$stack)[1].$line_info.split(',')[0]);
+        trace.line_no = trace.next_line_no = $B.last(err.$stack)[1].$line_info?(+($B.last(err.$stack)[1].$line_info.split(',')[0])):-1;
         trace.column_no_start = 0;
         trace.column_no_stop = 200;
         if (err.args[1] && err.args[1][1] === trace.line_no) {
@@ -747,8 +747,10 @@
             if (!match) {
                 return null;
             }
+            var indent = match[1].length;
+            indent += indent%4?4-indent%4:0;
             return {
-                indent: match[1].length,
+                indent: indent ,
                 indentString: match[1],
                 match: match,
                 index: match.index
@@ -778,7 +780,7 @@
             newCode += indent;
             // somehow seems to have proven useless
             // newCode += traceCall + "({event:'line', type:'afterwhile', frame:$B.last($B.frames_stack), line_no: " + (lastLine) + ", next_line_no: " + (lastLine) + "});\n";
-            newCode += code.substr(res.index + indent.length);
+            newCode += code.substr(res.index + code.substr(res.index).indexOf("}") + 1);
             return newCode;
         }
 

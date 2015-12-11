@@ -1,3 +1,7 @@
+import math
+
+s = math.sqrt(eval(input("enter something to square root")))
+
 # python expressions
 
 1
@@ -139,3 +143,9 @@ def rec(n):
     rec(n-1)
 
 rec(2)
+
+def print_nums(x):
+  for i in range(x):
+    print(i)
+
+print_nums(10)

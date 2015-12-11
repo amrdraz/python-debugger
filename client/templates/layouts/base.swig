@@ -87,7 +87,7 @@
     
     {# <script src="scripts/brython/www/src/brython.js"></script> #}
 
-    <!-- build:js(client) scripts/brython.js -->
+    <!-- build:js(client) scripts/brython/www/src/brython.js -->
     <script type="text/javascript" src="scripts/brython/www/src/brython_builtins.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/version_info.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/identifiers_re.js"></script>
