@@ -341,10 +341,13 @@ $BRGeneratorDict.__next__ = function(self){
     try{
         var res = self._next.apply(null, self.args)
     }catch(err){
+        var last_frame = $B.last($B.frames_stack)
         self._next = function(){
-            var _err = StopIteration('after exception')
-            _err.caught = true
-            throw _err
+            var $locals = $B.vars[self.iter_id]
+            // Must enter a frame with the correct local id, to balance the
+            // call to leave_frame in the "finally" clause
+            $B.enter_frame([self.iter_id, $locals,self.env[0],{}])
+            throw StopIteration('after exception')
         }
         clear_ns(self.iter_id)
         throw err
@@ -354,7 +357,6 @@ $BRGeneratorDict.__next__ = function(self){
         // generators, so we must call it here to pop from frames stack
         $B.leave_frame(self.iter_id)
     }
-
     if(res===undefined){throw StopIteration("")}
 
     if(res[0].__class__==$GeneratorReturn){
@@ -396,7 +398,8 @@ $BRGeneratorDict.__next__ = function(self){
     func_node = self.func_root.children[1]
     
     // restore $locals, saved in $B.vars[self.iter_id] in previous iteration
-    var js = 'var $locals = $B.vars["'+self.iter_id+'"];'
+    var js = 'var $locals = $B.vars["'+self.iter_id+
+        '"], $local_name="'+self.iter_id+'";'
     fnode.addChild(new $B.genNode(js))
     // add a node to enter the frame
     var env = $B.last(self.env)

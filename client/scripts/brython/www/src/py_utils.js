@@ -188,7 +188,6 @@ $B.$list_comp = function(env){
         var res = eval('$locals_'+listcomp_name+'["x"+$ix]')
     }
     catch(err){
-        console.log('list comp error\n',err)
         throw $B.exception(err)
     }
     finally{
@@ -351,11 +350,35 @@ $B.$lambda = function(env,args,body){
 // but introduced by "from A import *" or by exec
 
 $B.$search = function(name, global_ns){
-    var res = global_ns[name]
-    if(res===undefined){
+    // search in local and global namespaces
+    var frame = $B.last($B.frames_stack)
+    if(frame[1][name]!==undefined){return frame[1][name]}
+    else if(frame[3][name]!==undefined){return frame[3][name]}
+    else if(_b_[name]!==undefined){return _b_[name]}
+    else{
+        if(frame[0]==frame[2]){throw _b_.NameError(name)}
+        else{throw _b_.UnboundLocalError("local variable '"+name+
+                "' referenced before assignment")}
+    }
+}
+
+$B.$global_search = function(name){
+    // search in global namespace
+    var frame = $B.last($B.frames_stack)
+    if(frame[3][name]!==undefined){return frame[3][name]}
+    else{
         throw _b_.NameError(name)
     }
-    return res
+}
+
+$B.$local_search = function(name){
+    // search in local namespace
+    var frame = $B.last($B.frames_stack)
+    if(frame[1][name]!==undefined){return frame[1][name]}
+    else{
+        throw _b_.UnboundLocalError("local variable '"+name+
+                "' referenced before assignment")
+    }
 }
 
 // transform native JS types into Brython types
@@ -369,8 +392,11 @@ $B.$JS2Py = function(src){
     if(klass!==undefined){
         if(klass===_b_.list.$dict){
             for(var i=0, _len_i = src.length; i< _len_i;i++) src[i] = $B.$JS2Py(src[i])
+        }else if(klass===$B.JSObject.$dict){
+            src = src.js
+        }else{
+            return src
         }
-        return src
     }
     if(typeof src=="object"){
         if($B.$isNode(src)) return $B.DOMNode(src)
@@ -594,7 +620,7 @@ $B.$syntax_err_line = function(exc,module,pos) {
     //  line=line.substr(1)
     //  lpos--
     //}
-    exc.args = _b_.tuple([$B.$getitem(exc.args,0),_b_.tuple([module, line_num, lpos, line])])
+    exc.args = _b_.tuple([$B.$getitem(exc.args,0), module, line_num, lpos, line])
 }
 
 $B.$SyntaxError = function(module,msg,pos) {
@@ -830,7 +856,6 @@ $B.pyobject2jsobject=function (obj){
     if (_b_.hasattr(obj, '__dict__')) {
        return $B.pyobject2jsobject(_b_.getattr(obj, '__dict__'))
     }
-    console.log('error', obj)
     throw _b_.TypeError(_b_.str(obj)+' is not JSON serializable')
 }
 
@@ -1049,17 +1074,23 @@ $B.int_value = function(v){
 }
 
 $B.enter_frame = function(frame){
+    // Enter execution frame : save on top of frames stack
+    //console.log('enter frame', frame[0])
     if($B.frames_stack===undefined){alert('frames stack udef')}
     $B.frames_stack[$B.frames_stack.length]=frame
 }
 
 $B.leave_frame = function(arg){
-    // We must leave at least the frame for the main program
-    if($B.frames_stack.length>1){
-        var top = $B.last($B.frames_stack)
-       $B.frames_stack.pop()
-        //delete $B.modules[frame[0]],$B.$py_src[frame[0]]
+    // Leave execution frame
+    //console.log('leave frame', arg)
+    if($B.frames_stack.length==0){console.log('empty stack');return}
+    var last = $B.last($B.frames_stack)
+    if(last[0]!=arg){
+        // print a warning if arg is not on top of frames stack
+        console.log('leave error', 'leaving', arg, 'last on stack', last[0])
     }
+    $B.frames_stack.pop()
+    //console.log($B.frames_stack.length, 'frames remain')
 }
 
 var min_int=Math.pow(-2, 53), max_int=Math.pow(2,53)-1

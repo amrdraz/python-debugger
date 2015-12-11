@@ -63,7 +63,11 @@ var opnames = ['add','sub','mul','truediv','floordiv','mod','pow',
     'lshift','rshift','and','xor','or']
 var opsigns = ['+','-','*','/','//','%','**','<<','>>','&','^', '|']
 
-$ObjectDict.__delattr__ = function(self,attr){delete self[attr]; return _b_.None}
+$ObjectDict.__delattr__ = function(self,attr){
+    _b_.getattr(self, attr) // raises AttributeError if necessary
+    delete self[attr]; 
+    return _b_.None
+}
 
 $ObjectDict.__dir__ = function(self) {
     var objects = [self], pos=1
@@ -105,6 +109,13 @@ $ObjectDict.__eq__ = function(self,other){
        }
     }
     return self===other
+}
+
+$ObjectDict.__format__ = function(){
+    var $ = $B.args('__format__', 2, {self:null, spec:null},
+        ['self', 'spec'], arguments, {}, null, null)
+    if($.spec!==''){throw _b_.TypeError("non-empty format string passed to object.__format__")}
+    return _b_.getattr($.self, '__repr__')()
 }
 
 $ObjectDict.__ge__ = $ObjectNI('__ge__','>=')
@@ -251,17 +262,20 @@ $ObjectDict.__getattribute__ = function(obj,attr){
             var rank = opnames.indexOf(attr1)
             if(rank > -1){
                 var rop = '__r'+opnames[rank]+'__' // name of reflected operator
-                return function(){
+                var func = function(){
                     try{
                         // Operands must be of different types
-                        if($B.$get_class(arguments[0])===klass){throw Error('')}
+                        if($B.get_class(arguments[0])===klass){throw Error('')}
                         return _b_.getattr(arguments[0],rop)(obj)
                     }catch(err){
-                        var msg = "unsupported operand types for "+opsigns[rank]+": '"
-                        msg += klass.__name__+"' and '" //+arguments[0].__class__.__name__+"'"
+                        var msg = "unsupported operand types for "+
+                            opsigns[rank]+": '"+ klass.__name__+"' and '"+
+                            $B.get_class(arguments[0]).__name__+"'"
                         throw _b_.TypeError(msg)
                     }
                 }
+                func.$infos = {__name__ : klass.__name__+'.'+attr}
+                return func
             }
         }
         //throw AttributeError('object '+obj.__class__.__name__+" has no attribute '"+attr+"'")

@@ -258,7 +258,7 @@ $B.run_py=run_py=function(module_contents,path,module,compiled) {
     if (!compiled) {
         var $Node = $B.$Node,$NodeJSCtx=$B.$NodeJSCtx
         $B.$py_module_path[module.__name__]=path
-
+        
         var root = $B.py2js(module_contents,module.__name__,
             module.__name__,'__builtins__')
 
@@ -279,6 +279,7 @@ $B.run_py=run_py=function(module_contents,path,module,compiled) {
         var ex_node = new $Node('expression')
         new $NodeJSCtx(ex_node,')(__BRYTHON__)')
         root.add(ex_node)
+        
     }
 
     try{
@@ -290,15 +291,19 @@ $B.run_py=run_py=function(module_contents,path,module,compiled) {
         eval(js)
 
     }catch(err){
+        /*
         console.log(err+' for module '+module.__name__)
-        //console.log(module_contents)
-        //for(var attr in err){
-            //console.log(attr, err[attr])
-        //}
+        console.log(err)
+        //console.log(module_contents
+        for(var attr in err){
+            console.log(attr, err[attr])
+        }
+        console.log(_b_.getattr(err, 'info'))
         console.log('message: '+err.$message)
         console.log('filename: '+err.fileName)
         console.log('linenum: '+err.lineNumber)
         if($B.debug>0){console.log('line info '+ $B.line_info)}
+        */
         throw err
     }
 
@@ -760,13 +765,13 @@ $B.is_none = function (o) {
 
 // Default __import__ function
 // TODO: Include at runtime in importlib.__import__
-$B.$__import__ = function (mod_name, locals, fromlist, blocking){
+$B.$__import__ = function (mod_name, globals, locals, fromlist, level, blocking){
    // [Import spec] Halt import logic
    var modobj = $B.imported[mod_name],
        parsed_name = mod_name.split('.');
    if (modobj == _b_.None) {
        // [Import spec] Stop loading loop right away
-       throw _b_.ImportError(parent_name) 
+       throw _b_.ImportError(mod_name) 
    }
 
    if (modobj === undefined) {
@@ -776,8 +781,8 @@ $B.$__import__ = function (mod_name, locals, fromlist, blocking){
             fromlist = [];
        }
        // TODO: Async module download and request multiplexing
-       for (var i = 0, modsep = '', _mod_name = '', l = parsed_name.length - 1,
-                __path__ = _b_.None; i <= l; ++i) {
+       for (var i = 0, modsep = '', _mod_name = '', len = parsed_name.length - 1,
+                __path__ = _b_.None; i <= len; ++i) {
             var _parent_name = _mod_name;
             _mod_name += modsep + parsed_name[i];
             modsep = '.';
@@ -789,8 +794,8 @@ $B.$__import__ = function (mod_name, locals, fromlist, blocking){
             else if (modobj === undefined) {
                 try {$B.import_hooks(_mod_name, __path__, undefined, blocking)}
                 catch(err) {
-                    console.log(err)
                     delete $B.imported[_mod_name]
+                    throw err
                 }
 
                 if (is_none($B.imported[_mod_name])) {
@@ -807,9 +812,18 @@ $B.$__import__ = function (mod_name, locals, fromlist, blocking){
             }
             // else { } // [Import spec] Module cache hit . Nothing to do.
             // [Import spec] If __path__ can not be accessed an ImportError is raised
-            if (i < l) {
+            if (i < len) {
                 try { __path__ = _b_.getattr($B.imported[_mod_name], '__path__') }
-                catch (e) { throw _b_.ImportError(_mod_name) }
+                catch (e) { 
+                    // If this is the last but one part, and the last part is
+                    // an attribute of module, and this attribute is a module,
+                    // return it. This is the case for os.path for instance
+                    if(i==len-1 && $B.imported[_mod_name][parsed_name[len]] && 
+                        $B.imported[_mod_name][parsed_name[len]].__class__===$B.$ModuleDict){
+                        return $B.imported[_mod_name][parsed_name[len]]
+                    }
+                    throw _b_.ImportError(_mod_name) 
+                }
             }
        }
    }
@@ -879,15 +893,16 @@ $B.$import = function(mod_name, fromlist, aliases, locals, blocking){
 
     // [Import spec] Resolve __import__ in global namespace
     var current_frame = $B.frames_stack[$B.frames_stack.length-1],
-        globals = current_frame[3],
-        __import__ = globals['__import__'];
+        _globals = current_frame[3],
+        __import__ = _globals['__import__'],
+        globals = $B.obj_dict(_globals);
     if (__import__ === undefined) {
         // [Import spec] Fall back to
         __import__ = $B.$__import__;
     }
     // FIXME: Should we need locals dict supply it in, now it is useless
-    var modobj = _b_.getattr(__import__,
-                             '__call__')(mod_name, undefined, fromlist, blocking);
+    var modobj = _b_.getattr(__import__, '__call__')(mod_name, globals, 
+        undefined, fromlist, 0);
 
     // Apply bindings upon local namespace
     if (!fromlist || fromlist.length == 0) {
@@ -935,9 +950,8 @@ $B.$import = function(mod_name, fromlist, aliases, locals, blocking){
                     // [Import spec] attempt to import a submodule with that name ...
                     // FIXME : level = 0 ? level = 1 ?
                     try {
-                        _b_.getattr(__import__,
-                                    '__call__')(mod_name + '.' + name,
-                                                 undefined, [], blocking);
+                        _b_.getattr(__import__, '__call__')(mod_name + '.' + name, 
+                            globals, undefined, [], 0);
                     }
                     catch ($err2) {
                         if ($err2.__class__ = _b_.ImportError.$dict) {
@@ -950,7 +964,6 @@ $B.$import = function(mod_name, fromlist, aliases, locals, blocking){
                         locals[alias] = _b_.getattr(modobj, name);
                     }
                     catch ($err3) {
-                        console.log('error', $err3)
                         // [Import spec] On attribute not found , raise ImportError
                         if ($err3.__class__ === _b_.AttributeError.$dict) {
                             $err3.__class__ = _b_.ImportError.$dict;

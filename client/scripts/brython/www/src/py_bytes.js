@@ -223,6 +223,17 @@ $BytesDict.__lt__ = function(self,other){
 
 $BytesDict.__mro__ = [$BytesDict,$ObjectDict]
 
+$BytesDict.__mul__ = function(){
+    var $ = $B.args('__mul__', 2, {self:null, other:null}, ['self', 'other'],
+        arguments, {}, null, null),
+        other = $B.PyNumber_Index($.other),
+        res = bytes()
+    for(var i=0; i<other; i++){
+        res.source = res.source.concat($.self.source)
+    }
+    return res
+}
+
 $BytesDict.__ne__ = function(self,other){return !$BytesDict.__eq__(self,other)}
 
 $BytesDict.__repr__ = $BytesDict.__str__ = function(self){
@@ -295,6 +306,32 @@ $BytesDict.maketrans=function(from, to) {
     return bytes(_t)
 }
 
+$BytesDict.split = function(){
+    var $ = $B.args('split', 2, {self:null, sep:null}, ['self', 'sep'],
+        arguments, {}, null, null),
+        res=[], start=0, stop=0
+    var seps = $.sep.source, 
+        len = seps.length, 
+        src = $.self.source,
+        blen = src.length
+        
+    while(stop<blen){
+        var match=true
+        for(var i=0;i<len && match;i++){
+            if(src[stop+i]!=seps[i]){match=false}
+        }
+        if(match){
+            res.push(bytes(src.slice(start, stop)))
+            start = stop+len
+            stop = start
+        }else{
+            stop++
+        }
+    }
+    if(match || (stop>start)){res.push(bytes(src.slice(start, stop)))}
+    return res
+}
+
 function _strip(self,cars,lr){
     if(cars===undefined){
         cars = [], pos=0
@@ -319,6 +356,33 @@ function _strip(self,cars,lr){
 
 $BytesDict.lstrip = function(self,cars) {return _strip(self,cars,'l')}
 $BytesDict.rstrip = function(self,cars) {return _strip(self,cars,'r')}
+
+$BytesDict.startswith = function(){
+    var $ = $B.args('startswith', 2, {self: null, start: null}, 
+        ['self', 'start'], arguments, {}, null, null)
+    if(_b_.isinstance($.start, bytes)){
+        var res = true
+        for(var i=0;i<$.start.source.length && res;i++){
+            res = $.self.source[i]==$.start.source[i]
+        }
+        return res
+    }else if(_b_.isinstance($.start, _b_.tuple)){
+        var items = []
+        for(var i=0;i<$.start.length; i++){
+            if(_b_.isinstance($.start[i], bytes)){
+                items = items.concat($.start[i].source)
+            }else{
+                throw _b_.TypeError("startswith first arg must be bytes or "+
+                    "a tuple of bytes, not "+$B.get_class($.start).__name__)
+            }
+        }
+        var start = bytes(items)
+        return $BytesDict.startswith($.self, start)
+    }else{
+        throw _b_.TypeError("startswith first arg must be bytes or a tuple of bytes, not "+
+            $B.get_class($.start).__name__)
+    }
+}
 
 $BytesDict.strip = function(self,cars){
     var res = $BytesDict.lstrip(self,cars)
