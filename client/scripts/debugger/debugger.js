@@ -802,7 +802,7 @@
      */
     function runTrace(obj) {
         var js = obj.code;
-        // firstRunCheck();
+        firstRunCheck();
         // Initialise locals object
         try {
             eval('var $locals_' + obj.module_name + '= obj["' + obj.module_name + '"]');
@@ -848,15 +848,22 @@
         var module_name, local_name, current_globals_id, current_locals_name, current_globals_name;
         // Initialize global and local module scope
         firstRunCheck();
+
         var current_frame = $B.frames_stack[$B.frames_stack.length - 1];
-        var current_locals_id = current_frame[0];
-        current_locals_name = current_locals_id.replace(/\./, '_');
-        current_globals_id = current_frame[2] || current_locals_id;
-        current_globals_name = current_globals_id.replace(/\./, '_');
-        var _globals = _b_.dict([]);
-        module_name = _b_.dict.$dict.get(_globals, '__name__', 'exec_' + $B.UUID());
-        $B.$py_module_path[module_name] = $B.$py_module_path[current_globals_id];
-        local_name = module_name;
+        if (current_frame===undefined) {
+             var module_name = '__main__';
+            $B.$py_module_path[module_name] = window.location.href;
+            local_name = '__builtins__';
+        } else {
+            var current_locals_id = current_frame[0];
+            current_locals_name = current_locals_id.replace(/\./, '_');
+            current_globals_id = current_frame[2] || current_locals_id;
+            current_globals_name = current_globals_id.replace(/\./, '_');
+            var _globals = _b_.dict([]);
+            module_name = _b_.dict.$dict.get(_globals, '__name__', 'exec_' + $B.UUID());
+            $B.$py_module_path[module_name] = $B.$py_module_path[current_globals_id];
+            local_name = module_name;
+        }
         try {
             var root = $B.py2js(code, module_name, [module_name], local_name);
 
@@ -1033,7 +1040,7 @@
      * Initialize the first frame the first time Brython runs
      */
     function firstRunCheck() {
-        if ($B.frames_stack < 1) {
+        if ($B.frames_stack.length < 1) {
             var module_name = '__main__';
             $B.$py_module_path[module_name] = window.location.href;
             var root = $B.py2js("", module_name, module_name, '__builtins__');
