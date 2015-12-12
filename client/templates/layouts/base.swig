@@ -58,7 +58,12 @@
           <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
               <li>
-                  <a href="sandbox.html" class="btn" >
+                  <a href="image.html" class="btn" >
+                    Image Manipulation
+                  </a>
+              </li>
+              <li>
+                 <a href="sandbox.html" class="btn" >
                     Od Sandbox
                   </a>
               </li>

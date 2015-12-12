@@ -393,11 +393,13 @@
         if (lastState) {
             state.stdout = lastState.stdout;
             state.stderr = lastState.stderr;
-            state.locals = state.frame[1];
-            state.globals = state.frame[3];
-            state.var_names = Object.keys(state.locals).filter(function(key) {
-                return !/^(__|_|\$)/.test(key);
-            });
+            if (state.frame) {
+                state.locals = state.frame[1];
+                state.globals = state.frame[3];
+                state.var_names = Object.keys(state.locals).filter(function(key) {
+                    return !/^(__|_|\$)/.test(key);
+                });
+            }
             lastState.next_line_no = state.line_no;
         }
         if (isDisposableState(state)) {
@@ -593,8 +595,6 @@
         if (!wasHalted(err)) {
             errorWhileDebugging(err);
         }
-        $B.leave_frame();
-        $B.leave_frame();
         if (!wasHalted(err) && weStopDebugOnRuntimeError) {
             throw err;
         }
@@ -970,10 +970,10 @@
         var last_state;
         if (didErrorOccure && errorState.type === "syntax_error") {
             last_state = errorState;
-            errorState.frame = errorState.frame || {}
         } else {
             last_state = getLastRecordedState();
         }
+        last_state.frame = last_state.frame || {}
         return {
             states: recordedStates,
             prints: recordedOut,
