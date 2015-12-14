@@ -177,7 +177,7 @@
         imageData.setPixelData = function setPixelData (data) {
             var pixelData = imgData.pixelData = []
             for (var i = 0; i < imgData.data.length;i+=4){
-                pixel = Pixel(imgData.data, i);
+                pixel = Pixel(imgData.data, i/4);
                 pixelData.push(pixel);
             }
         }

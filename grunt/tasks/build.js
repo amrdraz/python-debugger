@@ -12,7 +12,7 @@ var taskConfig = function(grunt) {
     'copy:dist',
     'concurrent',
     'useminPrepare',
-    'concat:generated',
+    'concat',
     'cssmin',
     'autoprefixer:dist',
     'usemin',
