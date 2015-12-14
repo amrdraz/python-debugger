@@ -94,7 +94,9 @@
     var cout = {
         __class__: $io,
         write: function(data) {
-            doc("console").value += data;
+            if (data!="[class Image]\n") {
+                doc("console").value += data;
+            }
             return _b_.None;
         },
         flush: function() {}
@@ -138,7 +140,7 @@
         Game.can_draw(false);
         var src = editor.getValue();
         if (storage) {
-            storage["py_game_src"] = src;
+            storage["py_image_src"] = src;
         }
         Debugger.unset_events();
         var hist = Debugger.run_to_end(src);
@@ -170,6 +172,7 @@
         if (storage) {
             storage["py_image_src"] = src;
         }
+        Debugger.set_no_suppress_out(true);
         var hist = Debugger.start_debugger(src, true);
 
         PD.sendActivity({

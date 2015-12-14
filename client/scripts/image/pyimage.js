@@ -17,12 +17,20 @@
         imageCanvas: $('#imagecanvas'),
         tmpctx: $('#imagecanvas')[0].getContext('2d'),
         images: {},
-        imageObjects: [noneImage],
+        objects: [noneImage],
         subject: noneImage,
         draw: function draw() {
             if (Game.can_draw()) {
                 clearContext(game.ctx)
                 game.subject.draw();
+            }
+        },
+        addObject: function addObject (obj) {
+            if (obj.index!==undefined) {
+                game.objects[obj.index] = obj;
+            } else {
+                obj.index = game.objects.length;
+                game.objects.push(obj);
             }
         },
         red: '#ff0000',
@@ -53,7 +61,7 @@
                 return game.subject.getState();
             },
             set_state: function setState(state) {
-                game.subject = game.imageObjects[state.index];
+                game.subject = game.objects[state.index];
                 game.subject.setState(state)
             }
         };
@@ -87,7 +95,7 @@
         pixel.a = pixel.a || 255;
         _.assign(pixel, {
             setData: function (data, i) {
-                pixel.data = imgData.data;
+                pixel.data = data;
                 pixel.index = i;
                 pixel.r = data[index*4 + 0];
                 pixel.g = data[index*4 + 1];
@@ -140,10 +148,10 @@
                 return (threshold <= pixel.getAverage())?1:0;
             },
             setBit: function setBit (n) {
-                imgData.data[i*4 + 0] = pixel.r = 255 * (n) // R
-                imgData.data[i*4 + 1] = pixel.b = 255 * (n) // G
-                imgData.data[i*4 + 2] = pixel.g = 255 * (n) // B
-                imgData.data[i*4 + 3] = pixel.a = 255 // A
+                pixel.data[pixel.index*4 + 0] = pixel.r = 255 * (n) // R
+                pixel.data[pixel.index*4 + 1] = pixel.b = 255 * (n) // G
+                pixel.data[pixel.index*4 + 2] = pixel.g = 255 * (n) // B
+                pixel.data[pixel.index*4 + 3] = pixel.a = 255 // A
             },
             __str__: function toString() {
                 return pixel.hex();  
@@ -185,75 +193,76 @@
     }
 
     var ImageWrapper = function (imageData) {
-        var imgData = {};
-        imgData.imageData = imageData;
-        imgData.width = imageData.width;
-        imgData.height = imageData.height;
-        imgData.zoom = imgData.zoom || 1;
-        imgData.index = game.imageObjects.length;
-        game.imageObjects.push(imgData);
-        imgData.getPixel = function getPixel(x, y) {
-            return imgData.pixelData[x * imgData.width + y]
+        var image = {};
+        image.imageData = imageData;
+        image.width = imageData.width;
+        image.height = imageData.height;
+        image.zoom = image.zoom || 1;
+        game.addObject(image);
+        image.getPixel = function getPixel(x, y) {
+            return image.pixels[x * image.width + y]
         }
-        imgData.setPixelData = function setPixelData (imageData) {
-            var pixelData = imageData.pixelData;
-            if (!pixelData) {
-                pixelData = imgData.pixelData = []
+        image.setPixels = function setPixels (imageData) {
+            var pixels = image.pixels;
+            if (!pixels) {
+                pixels = image.pixels = []
                 for (var i = 0; i < imageData.data.length;i+=4){
                     pixel = Pixel(imageData.data, i/4);
-                    pixelData.push(pixel);
+                    pixels.push(pixel);
                 }
             } else {
-                for (var i = 0; i < imgData.pixelData.length;i+=1){
-                    imgData.pixelData[i].setData(imageData.data, i);
+                for (var i = 0; i < image.pixels.length;i+=1){
+                    var pixel = image.pixels[i].js?image.pixels[i].js:image.pixels[i];
+                        pixel.setData(imageData.data, i);
                 }
             }
         }
-        imgData.setZoom = function setZoom (zoom) {
-            imgData.zoom = zoom;
+        image.setZoom = function setZoom (zoom) {
+            image.zoom = zoom;
         }
-        imgData.getState = function getState() {
-            game.tmpctx.putImageData(imgData.imageData, 0, 0);
-            var data = game.tmpctx.getImageData(0, 0, imgData.imageData.width, imgData.imageData.height);
+        image.getState = function getState() {
+            game.tmpctx.putImageData(image.imageData, 0, 0);
+            var data = game.tmpctx.getImageData(0, 0, image.imageData.width, image.imageData.height);
             return {
-                index: imageData.index,
-                zoom: imageData.zoom,
+                index: image.index,
+                zoom: image.zoom,
                 imageData: data
             }
         }
-        imgData.setState = function setState(state) {
-            imgData.imgData = state.data
-            imgData.setPixelData(state.data);
-            imgData.zoom = state.zoom;
+        image.setState = function setState(state) {
+            image.imageData = state.imageData
+            image.setPixels(state.imageData);
+            image.zoom = state.zoom;
         }
-        imgData.draw = function draw () {
-            game.tmpctx.putImageData(imgData.imageData, 0, 0);
-            game.ctx.drawImage(game.imageCanvas[0], 0, 0, imgData.width, imgData.height, 0, 0, imgData.width * imgData.zoom, imgData.height * imgData.zoom);
+        image.draw = function draw () {
+            game.tmpctx.putImageData(image.imageData, 0, 0);
+            game.ctx.drawImage(game.imageCanvas[0], 0, 0, image.width, image.height, 0, 0, image.width * image.zoom, image.height * image.zoom);
         }
-        imageData.__str__ = function __str__() {
-            game.render(imageData)
+        image.__str__ = function __str__() {
+            game.render(image);
+            return "[class Image]";
         }
 
-        imgData.setPixelData(imgData.imageData);
-        return imgData;
+        image.setPixels(image.imageData);
+        return image;
     }
 
     var BitImage = function (width, height, bits) {
         if (bits.length > width*height) {
             throw new Error("BitImage must have bits equal to the width*hight");
         }
-        var imgData = game.tmpctx.createImageData(width, height);
+        var image = game.tmpctx.createImageData(width, height);
         
         for (var i = 0; i<bits.length;i+=1){
-            imgData.data[i*4 + 0] = 255 * (+bits.charAt(i)) // R
-            imgData.data[i*4 + 1] = 255 * (+bits.charAt(i)) // G
-            imgData.data[i*4 + 2] = 255 * (+bits.charAt(i)) // B
-            imgData.data[i*4 + 3] = 255 // A
+            image.data[i*4 + 0] = 255 * (+bits.charAt(i)) // R
+            image.data[i*4 + 1] = 255 * (+bits.charAt(i)) // G
+            image.data[i*4 + 2] = 255 * (+bits.charAt(i)) // B
+            image.data[i*4 + 3] = 255 // A
         }
 
-        imgData = ImageWrapper(imgData);
+        image = ImageWrapper(image);
 
-        return imgData;
+        return image;
     }
     var SimpleImage = function (imgKey) {
         if (!game.images[imgKey]) {
@@ -263,10 +272,10 @@
         game.imageCanvas.attr('width', img.width);
         game.imageCanvas.attr('height', img.height);
         game.tmpctx.drawImage(img, 0, 0);
-        imgData = game.tmpctx.getImageData(0, 0, img.width, img.height);
-        imgData = ImageWrapper(imgData);
+        var image = game.tmpctx.getImageData(0, 0, img.width, img.height);
+        image = ImageWrapper(image);
 
-        return imgData;
+        return image;
     }
 
     loadImages({
