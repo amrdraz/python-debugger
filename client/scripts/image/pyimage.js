@@ -280,9 +280,11 @@
 
     loadImages({
         'x.png': 'images/pixel/x.png',
+        '51020-orange.png': 'images/pixel/51020-orange.png',
         '51020-poppy.png': 'images/pixel/51020-poppy.png',
         '51020-stop-sign.png': 'images/pixel/51020-stop-sign.png',
         'puzzle-copper.png': 'images/pixel/puzzle-copper.png',
+        'puzzle-iron.png': 'images/pixel/puzzle-iron.png',
         'flowers.png': 'images/pixel/flowers.png',
         'stop.jpg': 'images/pixel/stop.jpg'
     }, function(images) {

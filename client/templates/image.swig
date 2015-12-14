@@ -34,10 +34,10 @@
 <div class="col-md-1 col-sm-2">
   <h4>Available Images</h4>
   <code>"x.png" <br/>
+    "flowers.png" <br/>
     "51020-orange.png" <br/>
     "51020-poppy.png" <br/>
     "51020-stop-sign.png" <br/>
-    "flowers.png" <br/>
     "puzzle-iron.png" <br/>
     "stop.jpg" <br/>
   </code>
@@ -48,7 +48,7 @@
     print(image) <br/>
     image.setZoom(1) <br/>
     image.getPixel(x, y) <br/>
-    image.pixelData<br/>
+    for pixel in image.pixels<br/>
     pixel.getColor()<br/>
     pixel.setRed(255)<br/>
     pixel.setGreen(255)<br/>
@@ -57,7 +57,6 @@
     pixel.hex<br/>
     pixel.bin<br/>
     print(pixel)<br/>
-    clear(color)
   </code>
 </div> <!-- leftcolumn -->
 </section>
