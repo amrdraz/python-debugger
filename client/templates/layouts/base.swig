@@ -130,7 +130,7 @@
     <script type="text/javascript" src="scripts/brython/www/src/py_import_hooks.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/async.js"></script>
 
-    <script type="text/javascript" src="scripts/brython/www/src/py_VFS.js"></script>
+    {# <script type="text/javascript" src="scripts/brython/www/src/py_VFS.js"></script> #}
     <!-- endbuild -->
 
     <!-- build:js(client) scripts/main.js -->
