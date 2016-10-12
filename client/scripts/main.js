@@ -35,6 +35,8 @@ var PD = window.PD = {
         }
         if(storage.getItem('student-id')){
             window['lougout_btn'].innerHTML = "Logout as "+storage.getItem('student-id')
+        } else {
+            window['lougout_btn'].innerHTML = "Login"
         }
     },
     sendActivity: function sendActivity(activity) {
