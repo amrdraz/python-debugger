@@ -26,7 +26,7 @@ var PD = window.PD = {
         // }
         if (!storage.getItem('student-id')) {
             var id = prompt(PD.constant.student_id_prompt_message)
-            storage.setItem('student-id', id);
+            if(id!==null) storage.setItem('student-id', id);
         }
         if (!storage.getItem('user-ip')) {
             PD.getIP(function (ip) {
