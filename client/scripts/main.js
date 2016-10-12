@@ -13,22 +13,36 @@
 ga('create', 'UA-68861516-1', 'auto');
 ga('send', 'pageview');
 
-var PD = {
+var PD = window.PD = {
+    constant: {
+        student_id_prompt_message: "please enter your guc student id: xx-*****\neg: 40-5610 or 37-12310",
+        student_username_prompt_message: "please enter your guc login username\neg: ahmed.mohamed"
+    },
     promprtForId: function promprtForId() {
-        var local = window.localStorage
-        if (!local.getItem('student-id')) {
-            var id = prompt("please enter your guc student id: 37-*****")
-            local.setItem('student-id', id);
+        var storage = window.localStorage
+        // if (!storage.getItem('student-username')) {
+        //     var id = prompt(PD.constant.student_username_prompt_message)
+        //     storage.setItem('student-username', id);
+        // }
+        if (!storage.getItem('student-id')) {
+            var id = prompt(PD.constant.student_id_prompt_message)
+            storage.setItem('student-id', id);
+        }
+        if (!storage.getItem('user-ip')) {
+            PD.getIP(function (ip) {
+                storage.setItem('user-ip', ip);
+            })
+        }
+        if(storage.getItem('student-id')){
+            window['lougout_btn'].innerHTML = "Logout as "+storage.getItem('student-id')
         }
     },
     sendActivity: function sendActivity(activity) {
-        var local = window.localStorage
-        if (!local.getItem('student-id')) {
-            var id = prompt("please enter your guc student id: 37-*****")
-            local.setItem('student-id', id);
-        }
+        var storage = window.localStorage
+        PD.promprtForId();
         activity.meta = activity.meta || {};
-        activity.meta['student-id'] = local.getItem('student-id');
+        activity.meta['student-id'] = storage.getItem('student-id');
+        activity.meta['user-ip'] = storage.getItem('user-ip');
         activity.event = activity.event || 'python-debugger.editor';
         activity.action = activity.action || 'run';
 
@@ -39,10 +53,26 @@ var PD = {
         });
 
     },
+    getIP: function getIP(cb) {
+        $.get('http://jsonip.com').done(function (json) {
+            cb(json.ip);
+        })
+    },
     logout: function logout() {
-        var local = window.localStorage
-        if (local.getItem('student-id')) {
-            local.removeItem('student-id');
+        var storage = window.localStorage
+        if (storage.getItem('student-id')) {
+            storage.removeItem('student-id');
+            PD.getIP(function (ip) {
+                storage.setItem('user-ip', ip);
+            })
+            window['lougout_btn'].innerHTML = "Login"
+        }
+    },
+    authAction: function authAction() {
+        if (localStorage.getItem('student-id')) {
+            PD.logout()
+        } else {
+            PD.promprtForId();
         }
     }
 }

@@ -73,10 +73,17 @@
                   </a>
               </li>
             </ul>
+            <ul class="nav navbar-nav pull-right">
+              <li>
+                  <a id="lougout_btn" onclick="PD.authAction()" class="btn" >
+                    Logout
+                  </a>
+              </li>
+            </ul>
           </div>
         </div>
     </div>
-  
+
     <div class="container-fluid marketing">
     {% block content %}{% endblock %}
     </div>
@@ -89,7 +96,7 @@
       {% block extra_script %}
       {% endblock %}
     <!-- endbuild -->
-    
+
     {# <script src="scripts/brython/www/src/brython.js"></script> #}
 
     <!-- build:js(client) scripts/brython/www/src/brython.js -->
@@ -123,9 +130,9 @@
     <script type="text/javascript" src="scripts/brython/www/src/py_import_hooks.js"></script>
     <script type="text/javascript" src="scripts/brython/www/src/async.js"></script>
 
-    {# <script type="text/javascript" src="scripts/brython/www/src/py_VFS.js"></script> #}
+    <script type="text/javascript" src="scripts/brython/www/src/py_VFS.js"></script>
     <!-- endbuild -->
-    
+
     <!-- build:js(client) scripts/main.js -->
     <script src="scripts/debugger/debugger.js" type="text/javascript" charset="utf-8"></script>
     <script src="scripts/main.js" type="text/javascript" charset="utf-8"></script>
@@ -133,6 +140,6 @@
 
     {% block extra_page_script %}
     {% endblock %}
-    
+
   </body>
 </html>
