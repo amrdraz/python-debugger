@@ -10,8 +10,12 @@
     m.parentNode.insertBefore(a, m)
 })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
 
-ga('create', 'UA-68861516-1', 'auto');
-ga('send', 'pageview');
+window.ga('create', 'UA-68861516-1', 'auto');
+window.ga('send', 'pageview');
+
+function analyticsEvent(category, action, label) {
+        window.ga('send', 'event', category, action, label);
+}
 
 var PD = window.PD = {
     constant: {
@@ -43,10 +47,12 @@ var PD = window.PD = {
         var storage = window.localStorage
         PD.promprtForId();
         activity.meta = activity.meta || {};
-        activity.meta['student-id'] = storage.getItem('student-id');
+        activity.meta['student-id'] = storage.getItem('student-id') || 'anonymous';
         activity.meta['user-ip'] = storage.getItem('user-ip');
         activity.event = activity.event || 'python-debugger.editor';
         activity.action = activity.action || 'run';
+
+        analyticsEvent(activity.event, activity.action, activity.meta['student-id'])
 
         $.post('http://www.kodr.in/api/activity', activity).done(function() {
             console.log('sucess');
